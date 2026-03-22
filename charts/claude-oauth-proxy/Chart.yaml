@@ -1,0 +1,18 @@
+apiVersion: v2
+name: claude-oauth-proxy
+description: An OpenAI-compatible Claude OAuth proxy for self-hosted use
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/bonztm/claude-oauth-proxy
+sources:
+  - https://github.com/bonztm/claude-oauth-proxy
+maintainers:
+  - name: bonztm
+    url: https://github.com/bonztm
+keywords:
+  - anthropic
+  - claude
+  - oauth
+  - openai-compatible
+  - proxy

@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build:
+    name: Test And Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Run Tests With Coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Capture Coverage Summary
+        run: go tool cover -func=coverage.out | tee coverage.summary
+
+      - name: Enforce Coverage Threshold
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          summary = pathlib.Path("coverage.summary").read_text()
+          match = re.search(r"^total:\s+\(statements\)\s+([0-9.]+)%$", summary, re.MULTILINE)
+          if not match:
+              print("Unable to find total coverage in coverage.summary", file=sys.stderr)
+              sys.exit(1)
+
+          actual = float(match.group(1))
+          threshold = 90.0
+          print(f"Total coverage: {actual:.1f}%")
+          if actual < threshold:
+              print(f"Coverage threshold failed: expected >= {threshold:.1f}%", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Build Binary
+        run: |
+          mkdir -p dist
+          short_sha="${GITHUB_SHA::7}"
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          version="${GITHUB_REF_NAME:-dev}"
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/bonztm/claude-oauth-proxy/internal/buildinfo.version=${version} -X github.com/bonztm/claude-oauth-proxy/internal/buildinfo.commitShort=${short_sha} -X github.com/bonztm/claude-oauth-proxy/internal/buildinfo.builtAt=${built_at}" -o dist/claude-oauth-proxy ./cmd/claude-oauth-proxy
+
+      - name: Lint Helm Chart
+        run: helm lint charts/claude-oauth-proxy
+
+      - name: Render Helm Chart
+        run: helm template claude-oauth-proxy charts/claude-oauth-proxy >/dev/null
+
+      - name: Validate Docker Compose Example
+        run: docker compose -f examples/docker-compose/docker-compose.yml config >/dev/null
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-oauth-proxy-linux-amd64
+          path: dist/claude-oauth-proxy
+          if-no-files-found: error
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-oauth-proxy-coverage
+          path: |
+            coverage.out
+            coverage.summary
+          if-no-files-found: error

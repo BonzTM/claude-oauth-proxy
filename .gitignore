@@ -1,0 +1,19 @@
+.DS_Store
+dist/
+coverage.out
+coverage_all.out
+artifacts/
+!artifacts/.gitkeep
+
+# Go
+bin/
+*.test
+
+# OAuth runtime state
+tokens.json
+
+# IDE
+.idea/
+.vscode/
+
+excalidraw.log

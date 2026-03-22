@@ -1,0 +1,79 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/bonztm/claude-oauth-proxy
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 9999
+  annotations: {}
+
+config:
+  apiKey:
+    value: sk-proxy-local-key
+    existingSecret:
+      name: ""
+      key: api-key
+  listenAddr: ":9999"
+  # Values here override the chart's built-in environment variables when keys overlap.
+  # Example:
+  # extraEnv:
+  #   CLAUDE_OAUTH_PROXY_API_KEY: my-custom-local-key
+  #   CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/custom/tokens.json
+  extraEnv: {}
+  extraEnvFrom: []
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: ""
+  mountPath: /var/lib/claude-oauth-proxy
+  tokenFileName: tokens.json
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: claude-oauth-proxy.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

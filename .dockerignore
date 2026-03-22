@@ -1,0 +1,14 @@
+.git
+.github
+artifacts
+coverage.out
+coverage_all.out
+dist
+docs
+deploy
+charts
+examples
+excalidraw.log
+*.log
+*.test
+bin

@@ -1,0 +1,14 @@
+services:
+  claude-oauth-proxy:
+    image: ghcr.io/bonztm/claude-oauth-proxy:${CLAUDE_OAUTH_PROXY_IMAGE_TAG:-latest}
+    container_name: claude-oauth-proxy
+    restart: unless-stopped
+    command:
+      - serve
+    ports:
+      - "9999:9999"
+    environment:
+      CLAUDE_OAUTH_PROXY_API_KEY: ${CLAUDE_OAUTH_PROXY_API_KEY:-sk-proxy-local-key}
+      CLAUDE_OAUTH_PROXY_TOKEN_FILE: /config/tokens.json
+    volumes:
+      - ./runtime:/config

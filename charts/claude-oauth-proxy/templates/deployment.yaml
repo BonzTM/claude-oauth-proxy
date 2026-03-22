@@ -1,0 +1,104 @@
+{{- include "claude-oauth-proxy.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "claude-oauth-proxy.fullname" . }}
+  labels:
+    {{- include "claude-oauth-proxy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "claude-oauth-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "claude-oauth-proxy.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "claude-oauth-proxy.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: claude-oauth-proxy
+          image: "{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - serve
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- if not (hasKey .Values.config.extraEnv "CLAUDE_OAUTH_PROXY_LISTEN_ADDR") }}
+            - name: CLAUDE_OAUTH_PROXY_LISTEN_ADDR
+              value: {{ .Values.config.listenAddr | quote }}
+            {{- end }}
+            {{- if not (hasKey .Values.config.extraEnv "CLAUDE_OAUTH_PROXY_TOKEN_FILE") }}
+            - name: CLAUDE_OAUTH_PROXY_TOKEN_FILE
+              value: {{ include "claude-oauth-proxy.tokenFilePath" . | quote }}
+            {{- end }}
+            {{- if not (hasKey .Values.config.extraEnv "CLAUDE_OAUTH_PROXY_API_KEY") }}
+            - name: CLAUDE_OAUTH_PROXY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "claude-oauth-proxy.apiKeySecretName" . }}
+                  key: {{ include "claude-oauth-proxy.apiKeySecretKey" . }}
+            {{- end }}
+            {{- range $key, $value := .Values.config.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.config.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: token-storage
+              mountPath: {{ .Values.persistence.mountPath }}
+      volumes:
+        - name: token-storage
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (include "claude-oauth-proxy.fullname" .) .Values.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

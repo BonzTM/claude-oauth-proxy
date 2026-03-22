@@ -1,0 +1,128 @@
+name: Helm Chart Release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag without v prefix, for example 1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: helm-chart-release-${{ github.ref_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  publish-helm-chart:
+    name: Package And Publish Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Resolve Chart Metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          chart_dir="charts/claude-oauth-proxy"
+          chart_version="$(awk '/^version:/ {print $2; exit}' "${chart_dir}/Chart.yaml")"
+          repo_owner_lower="${GITHUB_REPOSITORY_OWNER,,}"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          helm_repo_url="https://${repo_owner_lower}.github.io/${repo_name}"
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            release_tag="${{ github.event.release.tag_name }}"
+          else
+            release_tag="${{ inputs.release_tag }}"
+          fi
+
+          if [[ "${release_tag}" == v* ]]; then
+            echo "Release tags must be plain semantic versions without a v prefix." >&2
+            exit 1
+          fi
+          if ! [[ "${release_tag}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tags must use semantic versioning, for example 1.2.3 or 1.2.3-rc.1." >&2
+            exit 1
+          fi
+
+          {
+            echo "chart_dir=${chart_dir}"
+            echo "chart_version=${chart_version}"
+            echo "helm_repo_url=${helm_repo_url}"
+            echo "release_tag=${release_tag}"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "${release_tag}" != "${chart_version}" ]; then
+            echo "Chart version ${chart_version} must match release tag ${release_tag}." >&2
+            exit 1
+          fi
+
+      - name: Lint Chart
+        run: helm lint "${{ steps.meta.outputs.chart_dir }}"
+
+      - name: Render Chart
+        run: helm template claude-oauth-proxy "${{ steps.meta.outputs.chart_dir }}" >/dev/null
+
+      - name: Prepare Existing Chart Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf .chart-repo
+          mkdir -p .chart-repo
+
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch --depth=1 origin gh-pages
+            git --work-tree=.chart-repo checkout origin/gh-pages -- .
+          fi
+
+          find .chart-repo -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name '*.tgz' \
+            ! -name 'index.yaml' \
+            ! -name '.nojekyll' \
+            -exec rm -rf {} +
+
+          if [ -f ".chart-repo/claude-oauth-proxy-${{ steps.meta.outputs.chart_version }}.tgz" ]; then
+            echo "Chart version ${{ steps.meta.outputs.chart_version }} is already published." >&2
+            exit 1
+          fi
+
+      - name: Package Chart And Build Index
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          helm package "${{ steps.meta.outputs.chart_dir }}" --destination .chart-repo
+
+          if [ -f .chart-repo/index.yaml ]; then
+            helm repo index .chart-repo \
+              --url "${{ steps.meta.outputs.helm_repo_url }}" \
+              --merge .chart-repo/index.yaml
+          else
+            helm repo index .chart-repo --url "${{ steps.meta.outputs.helm_repo_url }}"
+          fi
+
+          touch .chart-repo/.nojekyll
+
+      - name: Publish Chart Artifacts
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .chart-repo
+          keep_files: false
+          enable_jekyll: false
+          commit_message: "chore(helm): publish chart ${{ steps.meta.outputs.chart_version }}"

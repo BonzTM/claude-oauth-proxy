@@ -1,0 +1,14 @@
+Thank you for installing claude-oauth-proxy.
+
+1. Forward the service locally:
+   kubectl port-forward svc/{{ include "claude-oauth-proxy.fullname" . }} 9999:{{ .Values.service.port }}
+
+2. Bootstrap Claude login with a headless exec session:
+   kubectl exec -it deployment/{{ include "claude-oauth-proxy.fullname" . }} -- /usr/local/bin/claude-oauth-proxy login --no-browser
+
+3. Use the local API key value you configured in your Kubernetes secret or chart values when pointing clients at the proxy.
+
+4. Check readiness after login:
+   kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+This image is minimal. Run the proxy binary directly with kubectl exec instead of relying on a shell inside the container.
