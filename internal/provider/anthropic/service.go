@@ -110,6 +110,9 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 		if hasToolUse {
 			finish = "tool_calls"
 		}
+		if streamUsage.CacheReadInputTokens > 0 || streamUsage.CacheCreationInputTokens > 0 {
+			streamUsage.PromptTokensDetails = &openai.PromptTokensDetails{CachedTokens: streamUsage.CacheReadInputTokens}
+		}
 		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}, Usage: &streamUsage}
 	}
 	next := func() (openai.ChatCompletionChunk, error) {
@@ -340,6 +343,9 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 		usage.TotalTokens = message.Usage.InputTokens + message.Usage.OutputTokens
 		usage.CacheCreationInputTokens = message.Usage.CacheCreationInputTokens
 		usage.CacheReadInputTokens = message.Usage.CacheReadInputTokens
+		if message.Usage.CacheReadInputTokens > 0 || message.Usage.CacheCreationInputTokens > 0 {
+			usage.PromptTokensDetails = &openai.PromptTokensDetails{CachedTokens: message.Usage.CacheReadInputTokens}
+		}
 	}
 	msg := openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}, ToolCalls: toolCalls}
 	return openai.ChatCompletionResponse{ID: fmt.Sprintf("chatcmpl-%d", createdAt.UnixNano()), Object: "chat.completion", Created: createdAt.Unix(), Model: model, Choices: []openai.ChatCompletionChoice{{Index: 0, Message: msg, FinishReason: finishReason}}, Usage: usage}
