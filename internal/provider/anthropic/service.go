@@ -124,7 +124,8 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 					hasToolUse = true
 					currentToolID = variant.ContentBlock.ID
 					currentToolName = variant.ContentBlock.Name
-					tc := openai.ToolCall{ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: ""}}
+					idx := toolCallIndex
+					tc := openai.ToolCall{Index: &idx, ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: ""}}
 					chunk := openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{ToolCalls: []openai.ToolCall{tc}}}}}
 					if !firstChunkSent {
 						chunk.Choices[0].Delta.Role = "assistant"
@@ -143,7 +144,8 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 					}
 					return chunk, nil
 				case ant.InputJSONDelta:
-					tc := openai.ToolCall{ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: delta.PartialJSON}}
+					idx := toolCallIndex - 1
+					tc := openai.ToolCall{Index: &idx, ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: delta.PartialJSON}}
 					chunk := openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{ToolCalls: []openai.ToolCall{tc}}}}}
 					return chunk, nil
 				}
