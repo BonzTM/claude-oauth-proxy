@@ -26,6 +26,12 @@ const (
 	EnvRefreshInterval = "CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL"
 	EnvRefreshSkew     = "CLAUDE_OAUTH_PROXY_REFRESH_SKEW"
 	EnvSeedFile        = "CLAUDE_OAUTH_PROXY_SEED_FILE"
+	EnvCCVersion       = "CLAUDE_OAUTH_PROXY_CC_VERSION"
+	EnvCCUserAgent     = "CLAUDE_OAUTH_PROXY_CC_USER_AGENT"
+	EnvCCSDKVersion    = "CLAUDE_OAUTH_PROXY_CC_SDK_VERSION"
+	EnvCCRuntimeVer    = "CLAUDE_OAUTH_PROXY_CC_RUNTIME_VERSION"
+	EnvCCOS            = "CLAUDE_OAUTH_PROXY_CC_OS"
+	EnvCCArch          = "CLAUDE_OAUTH_PROXY_CC_ARCH"
 )
 
 const (
@@ -41,7 +47,13 @@ const (
 	DefaultRequestTimeout  = "10m"
 	DefaultRefreshInterval = "1m"
 	DefaultRefreshSkew     = "5m"
-	DefaultBillingHeader   = "x-anthropic-billing-header: cc_version=2.1.77; cc_entrypoint=cli; cch=00000;"
+	DefaultBillingHeader   = "x-anthropic-billing-header: cc_version=%s; cc_entrypoint=cli; cch=00000;"
+	DefaultCCVersion       = "2.1.81"
+	DefaultUserAgent       = "claude-cli/2.1.81 (external, cli)"
+	DefaultSDKVersion      = "0.74.0"
+	DefaultRuntimeVersion  = "v25.8.1"
+	DefaultStainlessOS     = "Linux"
+	DefaultStainlessArch   = "x64"
 )
 
 type Config struct {
@@ -60,6 +72,12 @@ type Config struct {
 	RefreshInterval string
 	RefreshSkew     string
 	SeedFile        string
+	CCVersion       string
+	CCUserAgent     string
+	CCSDKVersion    string
+	CCRuntimeVer    string
+	CCOS            string
+	CCArch          string
 }
 
 func DefaultConfig() Config {
@@ -75,6 +93,12 @@ func DefaultConfig() Config {
 		OAuthRedirect:   DefaultOAuthRedirect,
 		AnthropicBeta:   DefaultAnthropicBeta,
 		BillingHeader:   DefaultBillingHeader,
+		CCVersion:       DefaultCCVersion,
+		CCUserAgent:     DefaultUserAgent,
+		CCSDKVersion:    DefaultSDKVersion,
+		CCRuntimeVer:    DefaultRuntimeVersion,
+		CCOS:            DefaultStainlessOS,
+		CCArch:          DefaultStainlessArch,
 		RequestTimeout:  DefaultRequestTimeout,
 		RefreshInterval: DefaultRefreshInterval,
 		RefreshSkew:     DefaultRefreshSkew,
@@ -114,6 +138,12 @@ func configFromEnv(getenv func(string) string, tokenFile func() string) Config {
 	apply(getenv(EnvRefreshInterval), &cfg.RefreshInterval)
 	apply(getenv(EnvRefreshSkew), &cfg.RefreshSkew)
 	apply(getenv(EnvSeedFile), &cfg.SeedFile)
+	apply(getenv(EnvCCVersion), &cfg.CCVersion)
+	apply(getenv(EnvCCUserAgent), &cfg.CCUserAgent)
+	apply(getenv(EnvCCSDKVersion), &cfg.CCSDKVersion)
+	apply(getenv(EnvCCRuntimeVer), &cfg.CCRuntimeVer)
+	apply(getenv(EnvCCOS), &cfg.CCOS)
+	apply(getenv(EnvCCArch), &cfg.CCArch)
 	return cfg
 }
 

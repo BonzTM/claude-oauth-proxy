@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ant "github.com/anthropics/anthropic-sdk-go"
@@ -23,16 +24,23 @@ type accessTokenSource interface {
 }
 
 type Config struct {
-	BaseURL       string
-	BetaHeader    string
-	BillingHeader string
-	HTTPClient    *http.Client
-	Now           func() time.Time
+	BaseURL        string
+	BetaHeader     string
+	BillingHeader  string
+	CCVersion      string
+	UserAgent      string
+	SDKVersion     string
+	RuntimeVersion string
+	StainlessOS    string
+	StainlessArch  string
+	HTTPClient     *http.Client
+	Now            func() time.Time
 }
 
 type service struct {
 	cfg         Config
 	tokenSource accessTokenSource
+	turnCounter atomic.Int64
 }
 
 func New(cfg Config, tokenSource accessTokenSource) provider.Service {
@@ -190,6 +198,15 @@ func (s *service) client(ctx context.Context, forceRefresh bool) (ant.Client, *c
 		option.WithAuthToken(token.Token),
 		option.WithHeaderAdd("anthropic-beta", s.cfg.BetaHeader),
 		option.WithHTTPClient(s.cfg.HTTPClient),
+		// Match Claude Code's request fingerprint.
+		option.WithHeader("User-Agent", s.cfg.UserAgent),
+		option.WithHeader("X-Stainless-Lang", "js"),
+		option.WithHeader("X-Stainless-Package-Version", s.cfg.SDKVersion),
+		option.WithHeader("X-Stainless-Runtime", "node"),
+		option.WithHeader("X-Stainless-Runtime-Version", s.cfg.RuntimeVersion),
+		option.WithHeader("X-Stainless-OS", s.cfg.StainlessOS),
+		option.WithHeader("X-Stainless-Arch", s.cfg.StainlessArch),
+		option.WithHeader("x-app", "cli"),
 	), nil
 }
 
@@ -226,7 +243,10 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 	}
 	systemBlocks := []ant.TextBlockParam{}
 	if strings.TrimSpace(s.cfg.BillingHeader) != "" {
-		systemBlocks = append(systemBlocks, ant.TextBlockParam{Text: s.cfg.BillingHeader})
+		turn := s.turnCounter.Add(1)
+		ccVersion := fmt.Sprintf("%s.%d", s.cfg.CCVersion, turn)
+		billingHeader := fmt.Sprintf(s.cfg.BillingHeader, ccVersion)
+		systemBlocks = append(systemBlocks, ant.TextBlockParam{Text: billingHeader})
 	}
 	// Find the last two user message indices for cache breakpoints.
 	// Breakpoint on second-to-last user message caches conversation history;

@@ -62,7 +62,7 @@ func TestListModelsAndChatCompletion(t *testing.T) {
 	}))
 	defer server.Close()
 	tokenSource := &fakeTokenSource{tokens: []auth.AccessTokenOutput{{Token: "token-1"}}}
-	svc := New(Config{BaseURL: server.URL + "/", BetaHeader: "oauth-2025-04-20", BillingHeader: "x-anthropic-billing-header: test", HTTPClient: server.Client(), Now: func() time.Time { return now }}, tokenSource)
+	svc := New(Config{BaseURL: server.URL + "/", BetaHeader: "oauth-2025-04-20", BillingHeader: "x-anthropic-billing-header: cc_version=%s; test", CCVersion: "1.0.0", HTTPClient: server.Client(), Now: func() time.Time { return now }}, tokenSource)
 
 	models, apiErr := svc.ListModels(context.Background(), provider.ListModelsInput{})
 	if apiErr != nil {
@@ -213,7 +213,7 @@ func TestMessageParamsRejectsInvalidRequestsAndTranslatesErrors(t *testing.T) {
 	if _, ok := New(Config{}, tokenSource).(*service); !ok {
 		t.Fatal("expected default-config service implementation")
 	}
-	base := &service{cfg: Config{BillingHeader: "billing"}}
+	base := &service{cfg: Config{BillingHeader: "billing: cc_version=%s", CCVersion: "1.0.0"}}
 	if _, apiErr := base.messageParams(openai.ChatCompletionRequest{}); apiErr == nil || apiErr.Code != "MODEL_REQUIRED" {
 		t.Fatalf("expected missing model error, got %v", apiErr)
 	}
