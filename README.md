@@ -4,16 +4,14 @@
 
 It is built for tools that already know how to talk to OpenAI-style endpoints, but where you want Claude behind the scenes instead.
 
-If you are brand new here, start with Docker Compose. It is the fastest path from "clone the repo" to "my app can talk to Claude."
-
 Important: this project uses a Claude OAuth flow that works for real users in practice, but Anthropic does not publicly position third-party Claude Pro/Max OAuth as a normal supported integration surface. Treat it as an experimental compatibility path.
 
 ## Start Here
 
 Choose one way to run the proxy:
 
-- Docker Compose: easiest for most users
-- Local binary: good if you prefer running directly on your machine
+- Local binary: fastest way to get started
+- Docker Compose: good for containerized workflows
 - Helm: the supported Kubernetes path
 
 Then the setup is always the same:
@@ -23,7 +21,67 @@ Then the setup is always the same:
 3. run the proxy
 4. point your client at `http://127.0.0.1:9999/v1`
 
-## Fastest Path: Docker Compose
+## Fastest Path: Local Binary
+
+Download the latest binary for your platform from the [Releases page](https://github.com/bonztm/claude-oauth-proxy/releases/latest). Extract it and place it somewhere on your `PATH`.
+
+If you prefer to build from source:
+
+```bash
+go build -o dist/claude-oauth-proxy ./cmd/claude-oauth-proxy
+```
+
+Authenticate:
+
+```bash
+claude-oauth-proxy login
+```
+
+Run the proxy:
+
+```bash
+claude-oauth-proxy serve
+```
+
+By default it listens on `http://127.0.0.1:9999` and uses the local API key `sk-proxy-local-key`.
+
+Point your client at the proxy:
+
+```bash
+export OPENAI_BASE_URL="http://127.0.0.1:9999/v1"
+export OPENAI_API_KEY="sk-proxy-local-key"
+```
+
+Quick smoke test:
+
+```bash
+curl http://127.0.0.1:9999/v1/models \
+  -H "Authorization: Bearer sk-proxy-local-key"
+```
+
+## Reusing Claude CLI Credentials
+
+If you already authenticated with the Claude CLI (`claude`), the proxy can use those credentials directly. Point it at your existing credentials:
+
+```bash
+claude-oauth-proxy serve --seed-file ~/.claude/.credentials.json
+```
+
+The proxy reads the seed on first start, then writes refreshed tokens to its own path. Your Claude CLI credentials are never modified.
+
+In Docker Compose, mount the file as a read-only volume instead:
+
+```yaml
+environment:
+  CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
+volumes:
+  - ~/.claude/.credentials.json:/config/credentials.json:ro
+  - claude-oauth-data:/var/lib/claude-oauth-proxy
+```
+
+See `docs/deploy/docker-compose.md` for a complete example.
+
+## Docker Compose
 
 Copy the example files:
 
@@ -54,69 +112,7 @@ Start the proxy:
 docker compose up -d
 ```
 
-Point your client at the proxy:
-
-```bash
-export OPENAI_BASE_URL="http://127.0.0.1:9999/v1"
-export OPENAI_API_KEY="sk-proxy-local-key"
-```
-
-Quick smoke test:
-
-```bash
-curl http://127.0.0.1:9999/v1/models \
-  -H "Authorization: Bearer sk-proxy-local-key"
-```
-
 More detail: `docs/deploy/docker-compose.md`
-
-## If You Already Logged In On Your Host
-
-If you already have a token file at:
-
-```text
-~/.config/claude-oauth-proxy/tokens.json
-```
-
-you do not need to log in again.
-
-Mount that directory into Docker Compose or into your container runtime, and the proxy will reuse the existing Claude session.
-
-## Reusing Claude CLI Credentials
-
-If you already authenticated with the Claude CLI (`claude`), the proxy can use those credentials directly. Mount `~/.claude/.credentials.json` as a read-only seed file:
-
-```yaml
-environment:
-  CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
-volumes:
-  - ~/.claude/.credentials.json:/config/credentials.json:ro
-  - claude-oauth-data:/var/lib/claude-oauth-proxy
-```
-
-The proxy reads the seed on first start, then writes refreshed tokens to its built-in writable path. Your Claude CLI credentials are never modified. See `docs/deploy/docker-compose.md` for a complete example.
-
-## Local Binary
-
-Build the binary:
-
-```bash
-go build -o dist/claude-oauth-proxy ./cmd/claude-oauth-proxy
-```
-
-Authenticate:
-
-```bash
-./dist/claude-oauth-proxy login
-```
-
-Run the proxy:
-
-```bash
-./dist/claude-oauth-proxy serve
-```
-
-By default it listens on `http://127.0.0.1:9999` and uses the local API key `sk-proxy-local-key`.
 
 ## Kubernetes With Helm
 
@@ -188,6 +184,8 @@ Default token path on a host machine:
 ```text
 ~/.config/claude-oauth-proxy/tokens.json
 ```
+
+**Extra usage and reauthentication:** if your Claude account enters "extra usage" (beyond the included allowance on your plan), you may need to reauthenticate the proxy. Claude can invalidate existing OAuth sessions when usage tiers change, so if you start seeing errors after hitting extra usage, run a fresh login.
 
 You can force a fresh login with:
 
