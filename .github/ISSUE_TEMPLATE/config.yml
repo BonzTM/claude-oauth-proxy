@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+    - name: Questions & Discussions
+      url: https://github.com/BonzTM/claude-oauth-proxy/discussions
+      about: Ask questions and discuss claude-oauth-proxy in GitHub Discussions
