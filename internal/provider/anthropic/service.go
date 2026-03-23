@@ -2,6 +2,7 @@ package anthropicprovider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -98,10 +99,17 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 	stream := client.Messages.NewStreaming(ctx, params)
 	firstChunkSent := false
 	finished := false
+	hasToolUse := false
 	chunkID := fmt.Sprintf("chatcmpl-%d", s.cfg.Now().UnixNano())
 	var streamUsage openai.Usage
+	// Track current tool call state for streaming.
+	var currentToolID, currentToolName string
+	var toolCallIndex int
 	finishChunk := func() openai.ChatCompletionChunk {
 		finish := "stop"
+		if hasToolUse {
+			finish = "tool_calls"
+		}
 		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}, Usage: &streamUsage}
 	}
 	next := func() (openai.ChatCompletionChunk, error) {
@@ -111,6 +119,20 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 		for stream.Next() {
 			event := stream.Current()
 			switch variant := event.AsAny().(type) {
+			case ant.ContentBlockStartEvent:
+				if variant.ContentBlock.Type == "tool_use" {
+					hasToolUse = true
+					currentToolID = variant.ContentBlock.ID
+					currentToolName = variant.ContentBlock.Name
+					tc := openai.ToolCall{ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: ""}}
+					chunk := openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{ToolCalls: []openai.ToolCall{tc}}}}}
+					if !firstChunkSent {
+						chunk.Choices[0].Delta.Role = "assistant"
+						firstChunkSent = true
+					}
+					toolCallIndex++
+					return chunk, nil
+				}
 			case ant.ContentBlockDeltaEvent:
 				switch delta := variant.Delta.AsAny().(type) {
 				case ant.TextDelta:
@@ -119,6 +141,10 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 						chunk.Choices[0].Delta.Role = "assistant"
 						firstChunkSent = true
 					}
+					return chunk, nil
+				case ant.InputJSONDelta:
+					tc := openai.ToolCall{ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: delta.PartialJSON}}
+					chunk := openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{ToolCalls: []openai.ToolCall{tc}}}}}
 					return chunk, nil
 				}
 			case ant.MessageStartEvent:
@@ -227,9 +253,54 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 				params.Messages = append(params.Messages, ant.NewUserMessage(ant.NewTextBlock(text)))
 			}
 		case "assistant":
-			params.Messages = append(params.Messages, ant.NewAssistantMessage(ant.NewTextBlock(text)))
+			if len(message.ToolCalls) > 0 {
+				var blocks []ant.ContentBlockParamUnion
+				if text != "" {
+					blocks = append(blocks, ant.NewTextBlock(text))
+				}
+				for _, tc := range message.ToolCalls {
+					var input json.RawMessage
+					if tc.Function.Arguments != "" {
+						input = json.RawMessage(tc.Function.Arguments)
+					} else {
+						input = json.RawMessage("{}")
+					}
+					blocks = append(blocks, ant.ContentBlockParamUnion{OfToolUse: &ant.ToolUseBlockParam{ID: tc.ID, Name: tc.Function.Name, Input: input}})
+				}
+				params.Messages = append(params.Messages, ant.MessageParam{Role: "assistant", Content: blocks})
+			} else {
+				params.Messages = append(params.Messages, ant.NewAssistantMessage(ant.NewTextBlock(text)))
+			}
+		case "tool":
+			result := ant.ToolResultBlockParam{ToolUseID: message.ToolCallID}
+			if text != "" {
+				result.Content = []ant.ToolResultBlockParamContentUnion{{OfText: &ant.TextBlockParam{Text: text}}}
+			}
+			params.Messages = append(params.Messages, ant.MessageParam{Role: "user", Content: []ant.ContentBlockParamUnion{{OfToolResult: &result}}})
 		default:
 			return ant.MessageNewParams{}, core.NewError("UNSUPPORTED_ROLE", http.StatusBadRequest, fmt.Sprintf("unsupported message role %q", message.Role), nil)
+		}
+	}
+	// Convert OpenAI tools to Anthropic tools; cache the last tool definition.
+	if len(request.Tools) > 0 {
+		for idx, tool := range request.Tools {
+			if tool.Type != "function" || tool.Function.Name == "" {
+				continue
+			}
+			tp := ant.ToolParam{Name: tool.Function.Name}
+			if tool.Function.Description != "" {
+				tp.Description = ant.String(tool.Function.Description)
+			}
+			if len(tool.Function.Parameters) > 0 {
+				var schema ant.ToolInputSchemaParam
+				if err := json.Unmarshal(tool.Function.Parameters, &schema); err == nil {
+					tp.InputSchema = schema
+				}
+			}
+			if idx == len(request.Tools)-1 {
+				tp.CacheControl = ant.NewCacheControlEphemeralParam()
+			}
+			params.Tools = append(params.Tools, ant.ToolUnionParam{OfTool: &tp})
 		}
 	}
 	if len(systemBlocks) > 0 {
@@ -242,12 +313,22 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 func mapResponse(model string, message *ant.Message, createdAt time.Time) openai.ChatCompletionResponse {
 	content := ""
 	finishReason := "stop"
+	var toolCalls []openai.ToolCall
 	if message != nil {
 		for _, block := range message.Content {
-			content += block.Text
+			switch block.Type {
+			case "text":
+				content += block.Text
+			case "tool_use":
+				args, _ := json.Marshal(block.Input)
+				toolCalls = append(toolCalls, openai.ToolCall{ID: block.ID, Type: "function", Function: openai.FunctionCall{Name: block.Name, Arguments: string(args)}})
+			}
 		}
 		if message.StopReason != "" {
 			finishReason = string(message.StopReason)
+			if finishReason == "tool_use" {
+				finishReason = "tool_calls"
+			}
 		}
 	}
 	usage := openai.Usage{}
@@ -258,7 +339,8 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 		usage.CacheCreationInputTokens = message.Usage.CacheCreationInputTokens
 		usage.CacheReadInputTokens = message.Usage.CacheReadInputTokens
 	}
-	return openai.ChatCompletionResponse{ID: fmt.Sprintf("chatcmpl-%d", createdAt.UnixNano()), Object: "chat.completion", Created: createdAt.Unix(), Model: model, Choices: []openai.ChatCompletionChoice{{Index: 0, Message: openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}}, FinishReason: finishReason}}, Usage: usage}
+	msg := openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}, ToolCalls: toolCalls}
+	return openai.ChatCompletionResponse{ID: fmt.Sprintf("chatcmpl-%d", createdAt.UnixNano()), Object: "chat.completion", Created: createdAt.Unix(), Model: model, Choices: []openai.ChatCompletionChoice{{Index: 0, Message: msg, FinishReason: finishReason}}, Usage: usage}
 }
 
 func unauthorized(err error) bool {

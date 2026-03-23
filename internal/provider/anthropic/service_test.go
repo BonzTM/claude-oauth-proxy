@@ -220,7 +220,7 @@ func TestMessageParamsRejectsInvalidRequestsAndTranslatesErrors(t *testing.T) {
 	if _, apiErr := base.messageParams(openai.ChatCompletionRequest{Model: "model"}); apiErr == nil || apiErr.Code != "MESSAGES_REQUIRED" {
 		t.Fatalf("expected missing messages error, got %v", apiErr)
 	}
-	if _, apiErr := base.messageParams(openai.ChatCompletionRequest{Model: "model", Messages: []openai.ChatCompletionMessage{{Role: "tool", Content: openai.MessageContent{Text: "bad"}}}}); apiErr == nil || apiErr.Code != "UNSUPPORTED_ROLE" {
+	if _, apiErr := base.messageParams(openai.ChatCompletionRequest{Model: "model", Messages: []openai.ChatCompletionMessage{{Role: "invalid", Content: openai.MessageContent{Text: "bad"}}}}); apiErr == nil || apiErr.Code != "UNSUPPORTED_ROLE" {
 		t.Fatalf("expected unsupported role error, got %v", apiErr)
 	}
 	if apiErr := translateError("oops", errors.New("boom")); apiErr.Code != "UPSTREAM_ERROR" || apiErr.StatusCode != http.StatusBadGateway {

@@ -45,9 +45,33 @@ func (c MessageContent) MarshalJSON() ([]byte, error) {
 }
 
 type ChatCompletionMessage struct {
-	Role    string         `json:"role"`
-	Content MessageContent `json:"content"`
-	Name    string         `json:"name,omitempty"`
+	Role       string         `json:"role"`
+	Content    MessageContent `json:"content"`
+	Name       string         `json:"name,omitempty"`
+	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
+	ToolCallID string         `json:"tool_call_id,omitempty"`
+}
+
+type ToolCall struct {
+	ID       string       `json:"id"`
+	Type     string       `json:"type"`
+	Function FunctionCall `json:"function"`
+}
+
+type FunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+type Tool struct {
+	Type     string       `json:"type"`
+	Function ToolFunction `json:"function"`
+}
+
+type ToolFunction struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Parameters  json.RawMessage `json:"parameters,omitempty"`
 }
 
 type ChatCompletionRequest struct {
@@ -59,6 +83,7 @@ type ChatCompletionRequest struct {
 	Stop        []string                `json:"stop,omitempty"`
 	Stream      bool                    `json:"stream,omitempty"`
 	User        string                  `json:"user,omitempty"`
+	Tools       []Tool                  `json:"tools,omitempty"`
 }
 
 type ModelsResponse struct {
@@ -91,8 +116,9 @@ type ChatCompletionChoice struct {
 }
 
 type ChatCompletionDelta struct {
-	Role    string `json:"role,omitempty"`
-	Content string `json:"content,omitempty"`
+	Role      string     `json:"role,omitempty"`
+	Content   string     `json:"content,omitempty"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
 type ChatCompletionChunk struct {
