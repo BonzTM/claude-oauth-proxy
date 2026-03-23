@@ -85,13 +85,8 @@ func TestHealthAndReadyEndpoints(t *testing.T) {
 func TestModelsAuthAndRequestLogging(t *testing.T) {
 	recorder := logging.NewRecorder()
 	handler := NewHandler(fakeProvider{modelsOut: provider.ListModelsOutput{Response: openai.ModelsResponse{Object: "list", Data: []openai.ModelInfo{{ID: "claude", Object: "model"}}}}}, fakeAuthService{statusOut: auth.StatusOutput{Exists: true}}, "secret", recorder, func() time.Time { return time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC) })
-	unauthorized := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
-	if unauthorized.Code != http.StatusUnauthorized {
-		t.Fatalf("unexpected unauthorized status: %d", unauthorized.Code)
-	}
+	// /v1/models does not require auth (allows unauthenticated model discovery).
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
-	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "claude") {

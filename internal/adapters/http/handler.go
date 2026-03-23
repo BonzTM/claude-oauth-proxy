@@ -34,7 +34,7 @@ func NewHandler(provider provider.Service, authService auth.Service, apiKey stri
 	mux.HandleFunc("/livez", h.handleHealth)
 	mux.HandleFunc("/ready", h.handleReady)
 	mux.HandleFunc("/readyz", h.handleReady)
-	mux.Handle("/v1/models", h.requireAPIKey(http.HandlerFunc(h.handleModels)))
+	mux.HandleFunc("/v1/models", h.handleModels)
 	mux.Handle("/v1/chat/completions", h.requireAPIKey(http.HandlerFunc(h.handleChatCompletions)))
 	mux.Handle("/v1/", h.requireAPIKey(http.HandlerFunc(h.handleUnsupportedEndpoint)))
 	return h.withRequestLogging(mux)

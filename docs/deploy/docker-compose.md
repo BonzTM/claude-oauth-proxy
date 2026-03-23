@@ -85,11 +85,10 @@ services:
       - "9999:9999"
     environment:
       CLAUDE_OAUTH_PROXY_API_KEY: ${CLAUDE_OAUTH_PROXY_API_KEY:-sk-proxy-local-key}
-      CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/tokens.json
       CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
     volumes:
       - ~/.claude/.credentials.json:/config/credentials.json:ro
-      - claude-oauth-data:/data
+      - claude-oauth-data:/var/lib/claude-oauth-proxy
 
 volumes:
   claude-oauth-data:
@@ -98,9 +97,10 @@ volumes:
 How this works:
 
 - on first start, the proxy reads your Claude CLI credentials from the read-only seed file
-- after the first token refresh, refreshed tokens are saved to `/data/tokens.json` on the writable volume
+- after the first token refresh, refreshed tokens are saved to `/var/lib/claude-oauth-proxy/tokens.json` on the named volume
 - your host `~/.claude/.credentials.json` is never modified
-- if the writable token file is removed, the proxy falls back to the seed again
+- refreshed tokens persist across container restarts via the named volume
+- if the volume is removed, the proxy falls back to the seed again
 
 ## API Key And Client Settings
 

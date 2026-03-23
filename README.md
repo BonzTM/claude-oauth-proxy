@@ -88,14 +88,13 @@ If you already authenticated with the Claude CLI (`claude`), the proxy can use t
 
 ```yaml
 environment:
-  CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/tokens.json
   CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
 volumes:
   - ~/.claude/.credentials.json:/config/credentials.json:ro
-  - claude-oauth-data:/data
+  - claude-oauth-data:/var/lib/claude-oauth-proxy
 ```
 
-The proxy reads the seed on first start, then writes refreshed tokens to a separate writable path. Your Claude CLI credentials are never modified. See `docs/deploy/docker-compose.md` for a complete example.
+The proxy reads the seed on first start, then writes refreshed tokens to its built-in writable path. Your Claude CLI credentials are never modified. See `docs/deploy/docker-compose.md` for a complete example.
 
 ## Local Binary
 
