@@ -37,7 +37,7 @@ const (
 	DefaultOAuthClientID   = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	DefaultOAuthScopes     = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
 	DefaultOAuthRedirect   = "https://platform.claude.com/oauth/code/callback"
-	DefaultAnthropicBeta   = "oauth-2025-04-20"
+	DefaultAnthropicBeta   = "oauth-2025-04-20,prompt-caching-2024-07-31"
 	DefaultRequestTimeout  = "10m"
 	DefaultRefreshInterval = "1m"
 	DefaultRefreshSkew     = "5m"

@@ -125,9 +125,13 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 				if msg := variant.Message; msg.Usage.InputTokens > 0 {
 					streamUsage.PromptTokens = int64(msg.Usage.InputTokens)
 					streamUsage.TotalTokens = int64(msg.Usage.InputTokens + msg.Usage.OutputTokens)
+					streamUsage.CacheCreationInputTokens = msg.Usage.CacheCreationInputTokens
+					streamUsage.CacheReadInputTokens = msg.Usage.CacheReadInputTokens
 				}
 			case ant.MessageDeltaEvent:
 				streamUsage.CompletionTokens = int64(variant.Usage.OutputTokens)
+				streamUsage.CacheCreationInputTokens = variant.Usage.CacheCreationInputTokens
+				streamUsage.CacheReadInputTokens = variant.Usage.CacheReadInputTokens
 				streamUsage.TotalTokens = streamUsage.PromptTokens + streamUsage.CompletionTokens
 			case ant.MessageStopEvent:
 				finished = true
@@ -192,7 +196,23 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 	if strings.TrimSpace(s.cfg.BillingHeader) != "" {
 		systemBlocks = append(systemBlocks, ant.TextBlockParam{Text: s.cfg.BillingHeader})
 	}
-	for _, message := range request.Messages {
+	// Find the last two user message indices for cache breakpoints.
+	// Breakpoint on second-to-last user message caches conversation history;
+	// breakpoint on last user message caches the current turn.
+	var userIndices []int
+	for i, message := range request.Messages {
+		if strings.TrimSpace(message.Role) == "user" {
+			userIndices = append(userIndices, i)
+		}
+	}
+	cacheSet := map[int]bool{}
+	if n := len(userIndices); n >= 2 {
+		cacheSet[userIndices[n-2]] = true
+		cacheSet[userIndices[n-1]] = true
+	} else if n == 1 {
+		cacheSet[userIndices[0]] = true
+	}
+	for i, message := range request.Messages {
 		text := strings.TrimSpace(message.Content.Text)
 		switch strings.TrimSpace(message.Role) {
 		case "system":
@@ -200,7 +220,12 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 				systemBlocks = append(systemBlocks, ant.TextBlockParam{Text: text})
 			}
 		case "user":
-			params.Messages = append(params.Messages, ant.NewUserMessage(ant.NewTextBlock(text)))
+			if cacheSet[i] {
+				cached := ant.TextBlockParam{Text: text, CacheControl: ant.NewCacheControlEphemeralParam()}
+				params.Messages = append(params.Messages, ant.NewUserMessage(ant.ContentBlockParamUnion{OfText: &cached}))
+			} else {
+				params.Messages = append(params.Messages, ant.NewUserMessage(ant.NewTextBlock(text)))
+			}
 		case "assistant":
 			params.Messages = append(params.Messages, ant.NewAssistantMessage(ant.NewTextBlock(text)))
 		default:
@@ -208,6 +233,7 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 		}
 	}
 	if len(systemBlocks) > 0 {
+		systemBlocks[len(systemBlocks)-1].CacheControl = ant.NewCacheControlEphemeralParam()
 		params.System = systemBlocks
 	}
 	return params, nil
@@ -229,6 +255,8 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 		usage.PromptTokens = message.Usage.InputTokens
 		usage.CompletionTokens = message.Usage.OutputTokens
 		usage.TotalTokens = message.Usage.InputTokens + message.Usage.OutputTokens
+		usage.CacheCreationInputTokens = message.Usage.CacheCreationInputTokens
+		usage.CacheReadInputTokens = message.Usage.CacheReadInputTokens
 	}
 	return openai.ChatCompletionResponse{ID: fmt.Sprintf("chatcmpl-%d", createdAt.UnixNano()), Object: "chat.completion", Created: createdAt.Unix(), Model: model, Choices: []openai.ChatCompletionChoice{{Index: 0, Message: openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}}, FinishReason: finishReason}}, Usage: usage}
 }
