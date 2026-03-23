@@ -23,12 +23,12 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_OAUTH_CLIENT_ID` | upstream-compatible default | OAuth client id |
 | `CLAUDE_OAUTH_PROXY_OAUTH_SCOPES` | upstream-compatible default | OAuth scopes string |
 | `CLAUDE_OAUTH_PROXY_OAUTH_REDIRECT_URI` | `https://platform.claude.com/oauth/code/callback` | Redirect URI used during login |
-| `CLAUDE_OAUTH_PROXY_ANTHROPIC_BETA` | `oauth-2025-04-20` | Anthropic beta header added upstream |
+| `CLAUDE_OAUTH_PROXY_ANTHROPIC_BETA` | `oauth-2025-04-20,prompt-caching-2024-07-31` | Anthropic beta header; prompt caching is now GA but header is kept for compatibility |
 | `CLAUDE_OAUTH_PROXY_LOG_LEVEL` | unset -> `info` | Structured log level |
 | `CLAUDE_OAUTH_PROXY_LOG_SINK` | unset -> `stderr` | Log output sink: `stderr`, `stdout`, or `discard` |
-| `CLAUDE_OAUTH_PROXY_REQUEST_TIMEOUT` | `10m` | Reserved request timeout config |
-| `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` | `1m` | Reserved refresh interval config |
-| `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` | `5m` | Refresh-before-expiry skew |
+| `CLAUDE_OAUTH_PROXY_REQUEST_TIMEOUT` | `10m` | Per-request timeout for upstream Anthropic calls |
+| `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` | `1m` | How often the background goroutine checks token freshness |
+| `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` | `5m` | Refresh token this long before it actually expires |
 | `CLAUDE_OAUTH_PROXY_SEED_FILE` | unset | Read-only seed token file (e.g. Claude CLI credentials) |
 
 ## Flags
@@ -167,3 +167,17 @@ That override path is especially useful when:
 
 - you want the API key value to come from your own env-management process instead of the chart-managed Secret
 - you want the runtime token file to live at a different mounted path than the chart default
+
+## Billing Header
+
+The proxy injects a billing metadata string as the first system block on every request. This is set internally and not configurable via environment variable. The default value identifies traffic as coming from a Claude CLI-compatible client.
+
+The billing header is included in the cached system prompt prefix, so it does not add per-request cost after the first turn.
+
+## Token Refresh
+
+The proxy keeps tokens fresh through two mechanisms:
+
+**Background refresh**: a goroutine ticks every `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` (default 1 minute) and calls `AccessToken`. If the token is within `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` (default 5 minutes) of expiry, a refresh is triggered. This means tokens are typically refreshed 5 minutes before they expire.
+
+**401 retry**: if an upstream Anthropic request returns HTTP 401, the proxy immediately retries with a forced token refresh. This handles edge cases where a token expires between the background check and the actual request. Clients see a slightly slower response but never an auth error under normal conditions.

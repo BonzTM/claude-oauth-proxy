@@ -158,11 +158,14 @@ More detail: `docs/deploy/kubernetes.md`
 ## What This Project Does
 
 - exposes an OpenAI-compatible API for Claude-backed requests
+- supports tool use / function calling (translated to Anthropic tool_use blocks)
+- applies prompt caching automatically to reduce cost and latency (see `docs/caching.md`)
 - stores OAuth tokens in a local file and reuses them across runs
 - refreshes tokens automatically while the proxy is running
+- retries transparently on 401 with a forced token refresh
 - supports:
   - `GET /v1/models`
-  - `POST /v1/chat/completions`
+  - `POST /v1/chat/completions` (streaming and non-streaming)
 - exposes health endpoints:
   - `GET /health`
   - `GET /healthz`
@@ -210,21 +213,95 @@ If you want the safest default, use `latest` or a pinned release like `1.2.3`.
 
 ## Common Client Settings
 
-Most OpenAI-compatible tools only need:
+Most OpenAI-compatible tools only need two environment variables:
 
 ```bash
 export OPENAI_BASE_URL="http://127.0.0.1:9999/v1"
 export OPENAI_API_KEY="sk-proxy-local-key"
 ```
 
-Example chat request:
+### opencode
+
+Add to `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "provider": {
+    "claude-proxy": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Claude OAuth Proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:9999/v1",
+        "apiKey": "sk-proxy-local-key"
+      },
+      "models": {
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6",
+          "tool_call": true,
+          "reasoning": true,
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "limit": { "context": 200000, "output": 16384 }
+        }
+      }
+    }
+  }
+}
+```
+
+### aider
+
+```bash
+aider --openai-api-base http://127.0.0.1:9999/v1 \
+      --openai-api-key sk-proxy-local-key \
+      --model openai/claude-sonnet-4-6
+```
+
+Or set in environment:
+
+```bash
+export OPENAI_API_BASE="http://127.0.0.1:9999/v1"
+export OPENAI_API_KEY="sk-proxy-local-key"
+aider --model openai/claude-sonnet-4-6
+```
+
+### Continue (VS Code / JetBrains)
+
+Add to `.continue/config.yaml`:
+
+```yaml
+models:
+  - name: Claude via Proxy
+    provider: openai
+    model: claude-sonnet-4-6
+    apiBase: http://127.0.0.1:9999/v1
+    apiKey: sk-proxy-local-key
+```
+
+### Any OpenAI SDK
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:9999/v1",
+    api_key="sk-proxy-local-key",
+)
+
+response = client.chat.completions.create(
+    model="claude-sonnet-4-6",
+    messages=[{"role": "user", "content": "Say hello in one short sentence."}],
+)
+print(response.choices[0].message.content)
+```
+
+### curl
 
 ```bash
 curl http://127.0.0.1:9999/v1/chat/completions \
   -H "Authorization: Bearer sk-proxy-local-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-4-5",
+    "model": "claude-sonnet-4-6",
     "messages": [
       {"role": "user", "content": "Say hello in one short sentence."}
     ]
@@ -247,6 +324,7 @@ claude-oauth-proxy version
 - Docker Compose guide: `docs/deploy/docker-compose.md`
 - Kubernetes/Helm guide: `docs/deploy/kubernetes.md`
 - Configuration reference: `docs/configuration.md`
+- Prompt caching: `docs/caching.md`
 - Helm chart details: `charts/claude-oauth-proxy/README.md`
 - Testing and validation: `docs/testing.md`
 

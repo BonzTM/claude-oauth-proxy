@@ -87,7 +87,7 @@ curl http://127.0.0.1:9999/v1/chat/completions \
   -H "Authorization: Bearer sk-proxy-local-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-4-5",
+    "model": "claude-sonnet-4-6",
     "stream": true,
     "messages": [
       {"role": "user", "content": "Reply with two short words."}
