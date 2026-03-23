@@ -99,9 +99,10 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 	firstChunkSent := false
 	finished := false
 	chunkID := fmt.Sprintf("chatcmpl-%d", s.cfg.Now().UnixNano())
+	var streamUsage openai.Usage
 	finishChunk := func() openai.ChatCompletionChunk {
 		finish := "stop"
-		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}}
+		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}, Usage: &streamUsage}
 	}
 	next := func() (openai.ChatCompletionChunk, error) {
 		if finished {
@@ -120,6 +121,14 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 					}
 					return chunk, nil
 				}
+			case ant.MessageStartEvent:
+				if msg := variant.Message; msg.Usage.InputTokens > 0 {
+					streamUsage.PromptTokens = int64(msg.Usage.InputTokens)
+					streamUsage.TotalTokens = int64(msg.Usage.InputTokens + msg.Usage.OutputTokens)
+				}
+			case ant.MessageDeltaEvent:
+				streamUsage.CompletionTokens = int64(variant.Usage.OutputTokens)
+				streamUsage.TotalTokens = streamUsage.PromptTokens + streamUsage.CompletionTokens
 			case ant.MessageStopEvent:
 				finished = true
 				return finishChunk(), nil
