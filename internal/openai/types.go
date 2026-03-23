@@ -76,15 +76,16 @@ type ToolFunction struct {
 }
 
 type ChatCompletionRequest struct {
-	Model       string                  `json:"model"`
-	Messages    []ChatCompletionMessage `json:"messages"`
-	MaxTokens   int64                   `json:"max_tokens,omitempty"`
-	Temperature *float64                `json:"temperature,omitempty"`
-	TopP        *float64                `json:"top_p,omitempty"`
-	Stop        []string                `json:"stop,omitempty"`
-	Stream      bool                    `json:"stream,omitempty"`
-	User        string                  `json:"user,omitempty"`
-	Tools       []Tool                  `json:"tools,omitempty"`
+	Model           string                  `json:"model"`
+	Messages        []ChatCompletionMessage `json:"messages"`
+	MaxTokens       int64                   `json:"max_tokens,omitempty"`
+	Temperature     *float64                `json:"temperature,omitempty"`
+	TopP            *float64                `json:"top_p,omitempty"`
+	Stop            []string                `json:"stop,omitempty"`
+	Stream          bool                    `json:"stream,omitempty"`
+	User            string                  `json:"user,omitempty"`
+	Tools           []Tool                  `json:"tools,omitempty"`
+	ReasoningEffort string                  `json:"reasoning_effort,omitempty"`
 }
 
 type ModelsResponse struct {
@@ -148,14 +149,19 @@ type ErrorPayload struct {
 }
 
 type Usage struct {
-	PromptTokens             int64              `json:"prompt_tokens,omitempty"`
-	CompletionTokens         int64              `json:"completion_tokens,omitempty"`
-	TotalTokens              int64              `json:"total_tokens,omitempty"`
-	PromptTokensDetails      *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
-	CacheCreationInputTokens int64              `json:"cache_creation_input_tokens,omitempty"`
-	CacheReadInputTokens     int64              `json:"cache_read_input_tokens,omitempty"`
+	PromptTokens             int64                    `json:"prompt_tokens,omitempty"`
+	CompletionTokens         int64                    `json:"completion_tokens,omitempty"`
+	TotalTokens              int64                    `json:"total_tokens,omitempty"`
+	PromptTokensDetails      *PromptTokensDetails     `json:"prompt_tokens_details,omitempty"`
+	CompletionTokensDetails  *CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
+	CacheCreationInputTokens int64                    `json:"cache_creation_input_tokens,omitempty"`
+	CacheReadInputTokens     int64                    `json:"cache_read_input_tokens,omitempty"`
 }
 
 type PromptTokensDetails struct {
 	CachedTokens int64 `json:"cached_tokens"`
+}
+
+type CompletionTokensDetails struct {
+	ReasoningTokens int64 `json:"reasoning_tokens"`
 }

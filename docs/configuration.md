@@ -30,6 +30,14 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` | `1m` | How often the background goroutine checks token freshness |
 | `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` | `5m` | Refresh token this long before it actually expires |
 | `CLAUDE_OAUTH_PROXY_SEED_FILE` | unset | Read-only seed token file (e.g. Claude CLI credentials) |
+| `CLAUDE_OAUTH_PROXY_CC_VERSION` | `2.1.81` | Claude Code version for billing header and User-Agent |
+| `CLAUDE_OAUTH_PROXY_CC_USER_AGENT` | `claude-cli/2.1.81 (external, cli)` | User-Agent header sent upstream |
+| `CLAUDE_OAUTH_PROXY_CC_SDK_VERSION` | `0.74.0` | JS SDK version for X-Stainless-Package-Version header |
+| `CLAUDE_OAUTH_PROXY_CC_RUNTIME_VERSION` | `v25.8.1` | Node.js version for X-Stainless-Runtime-Version header |
+| `CLAUDE_OAUTH_PROXY_CC_OS` | `Linux` | OS identifier for X-Stainless-OS header |
+| `CLAUDE_OAUTH_PROXY_CC_ARCH` | `x64` | Architecture for X-Stainless-Arch header |
+
+Use `scripts/extract-cc-fingerprint.sh` to derive current values from your installed Claude Code. See `docs/maintainers/FINGERPRINT.md` for details on each value.
 
 ## Flags
 

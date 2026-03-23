@@ -113,6 +113,7 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 	// Track current tool call state for streaming.
 	var currentToolID, currentToolName string
 	var toolCallIndex int
+	var streamThinkingChars int64
 	finishChunk := func() openai.ChatCompletionChunk {
 		finish := "stop"
 		if hasToolUse {
@@ -120,6 +121,9 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 		}
 		if streamUsage.CacheReadInputTokens > 0 || streamUsage.CacheCreationInputTokens > 0 {
 			streamUsage.PromptTokensDetails = &openai.PromptTokensDetails{CachedTokens: streamUsage.CacheReadInputTokens}
+		}
+		if streamThinkingChars > 0 {
+			streamUsage.CompletionTokensDetails = &openai.CompletionTokensDetails{ReasoningTokens: (streamThinkingChars + 3) / 4}
 		}
 		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}, Usage: &streamUsage}
 	}
@@ -154,6 +158,8 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 						firstChunkSent = true
 					}
 					return chunk, nil
+				case ant.ThinkingDelta:
+					streamThinkingChars += int64(len(delta.Thinking))
 				case ant.InputJSONDelta:
 					idx := toolCallIndex - 1
 					tc := openai.ToolCall{Index: &idx, ID: currentToolID, Type: "function", Function: openai.FunctionCall{Name: currentToolName, Arguments: delta.PartialJSON}}
@@ -333,6 +339,26 @@ func (s *service) messageParams(request openai.ChatCompletionRequest) (ant.Messa
 		systemBlocks[len(systemBlocks)-1].CacheControl = ant.NewCacheControlEphemeralParam()
 		params.System = systemBlocks
 	}
+	// Map OpenAI reasoning_effort to Anthropic extended thinking.
+	if effort := strings.TrimSpace(strings.ToLower(request.ReasoningEffort)); effort != "" {
+		var budgetTokens int64
+		switch effort {
+		case "low":
+			budgetTokens = 1024
+		case "medium":
+			budgetTokens = 8192
+		case "high":
+			budgetTokens = 32768
+		}
+		if budgetTokens > 0 {
+			if params.MaxTokens <= budgetTokens {
+				params.MaxTokens = budgetTokens + 4096
+			}
+			params.Thinking = ant.ThinkingConfigParamOfEnabled(budgetTokens)
+			// Extended thinking requires temperature to be unset (defaults to 1).
+			params.Temperature = ant.Float(1)
+		}
+	}
 	return params, nil
 }
 
@@ -340,11 +366,15 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 	content := ""
 	finishReason := "stop"
 	var toolCalls []openai.ToolCall
+	var thinkingTokens int64
 	if message != nil {
 		for _, block := range message.Content {
 			switch block.Type {
 			case "text":
 				content += block.Text
+			case "thinking":
+				// Estimate thinking tokens: ~4 chars per token is a rough heuristic.
+				thinkingTokens += int64(len(block.Thinking)+3) / 4
 			case "tool_use":
 				args, _ := json.Marshal(block.Input)
 				toolCalls = append(toolCalls, openai.ToolCall{ID: block.ID, Type: "function", Function: openai.FunctionCall{Name: block.Name, Arguments: string(args)}})
@@ -367,6 +397,9 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 		usage.CacheReadInputTokens = message.Usage.CacheReadInputTokens
 		if message.Usage.CacheReadInputTokens > 0 || message.Usage.CacheCreationInputTokens > 0 {
 			usage.PromptTokensDetails = &openai.PromptTokensDetails{CachedTokens: message.Usage.CacheReadInputTokens}
+		}
+		if thinkingTokens > 0 {
+			usage.CompletionTokensDetails = &openai.CompletionTokensDetails{ReasoningTokens: thinkingTokens}
 		}
 	}
 	msg := openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}, ToolCalls: toolCalls}
