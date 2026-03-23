@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -53,6 +54,28 @@ func (s *FileStore) Path() string {
 	return s.path
 }
 
+// claudeCredentials represents the Claude CLI ~/.claude/.credentials.json format.
+type claudeCredentials struct {
+	ClaudeAiOauth *claudeOauth `json:"claudeAiOauth"`
+}
+
+type claudeOauth struct {
+	AccessToken  string   `json:"accessToken"`
+	RefreshToken string   `json:"refreshToken"`
+	ExpiresAt    int64    `json:"expiresAt"`
+	Scopes       []string `json:"scopes"`
+}
+
+func (c *claudeOauth) toTokenSet() TokenSet {
+	return TokenSet{
+		AccessToken:  c.AccessToken,
+		RefreshToken: c.RefreshToken,
+		TokenType:    "Bearer",
+		Scope:        strings.Join(c.Scopes, " "),
+		ExpiresAt:    time.Unix(c.ExpiresAt, 0),
+	}
+}
+
 func (s *FileStore) Load(_ context.Context) (TokenSet, error) {
 	if s == nil {
 		return TokenSet{}, os.ErrInvalid
@@ -65,7 +88,12 @@ func (s *FileStore) Load(_ context.Context) (TokenSet, error) {
 	if err := json.Unmarshal(data, &tokenSet); err != nil {
 		return TokenSet{}, err
 	}
+	// If native format didn't yield an access token, try Claude CLI format.
 	if tokenSet.Missing() {
+		var creds claudeCredentials
+		if err := json.Unmarshal(data, &creds); err == nil && creds.ClaudeAiOauth != nil && creds.ClaudeAiOauth.AccessToken != "" {
+			return creds.ClaudeAiOauth.toTokenSet(), nil
+		}
 		return TokenSet{}, errors.New("token file does not contain an access token")
 	}
 	return tokenSet, nil
@@ -98,4 +126,37 @@ func (s *FileStore) Delete(_ context.Context) error {
 		return nil
 	}
 	return err
+}
+
+// FallbackStore writes to a primary store and falls back to a seed store for
+// initial reads. This allows mounting a read-only credentials file (e.g. the
+// Claude CLI's .credentials.json) while writing refreshed tokens to a separate
+// writable location.
+type FallbackStore struct {
+	primary Store
+	seed    Store
+}
+
+func NewFallbackStore(primary, seed Store) *FallbackStore {
+	return &FallbackStore{primary: primary, seed: seed}
+}
+
+func (f *FallbackStore) Path() string {
+	return f.primary.Path()
+}
+
+func (f *FallbackStore) Load(ctx context.Context) (TokenSet, error) {
+	ts, err := f.primary.Load(ctx)
+	if err == nil {
+		return ts, nil
+	}
+	return f.seed.Load(ctx)
+}
+
+func (f *FallbackStore) Save(ctx context.Context, tokenSet TokenSet) error {
+	return f.primary.Save(ctx, tokenSet)
+}
+
+func (f *FallbackStore) Delete(ctx context.Context) error {
+	return f.primary.Delete(ctx)
 }

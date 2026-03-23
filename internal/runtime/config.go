@@ -25,6 +25,7 @@ const (
 	EnvLogSink         = "CLAUDE_OAUTH_PROXY_LOG_SINK"
 	EnvRefreshInterval = "CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL"
 	EnvRefreshSkew     = "CLAUDE_OAUTH_PROXY_REFRESH_SKEW"
+	EnvSeedFile        = "CLAUDE_OAUTH_PROXY_SEED_FILE"
 )
 
 const (
@@ -58,6 +59,7 @@ type Config struct {
 	RequestTimeout  string
 	RefreshInterval string
 	RefreshSkew     string
+	SeedFile        string
 }
 
 func DefaultConfig() Config {
@@ -111,6 +113,7 @@ func configFromEnv(getenv func(string) string, tokenFile func() string) Config {
 	apply(getenv(EnvRequestTimeout), &cfg.RequestTimeout)
 	apply(getenv(EnvRefreshInterval), &cfg.RefreshInterval)
 	apply(getenv(EnvRefreshSkew), &cfg.RefreshSkew)
+	apply(getenv(EnvSeedFile), &cfg.SeedFile)
 	return cfg
 }
 

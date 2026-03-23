@@ -82,6 +82,21 @@ you do not need to log in again.
 
 Mount that directory into Docker Compose or into your container runtime, and the proxy will reuse the existing Claude session.
 
+## Reusing Claude CLI Credentials
+
+If you already authenticated with the Claude CLI (`claude`), the proxy can use those credentials directly. Mount `~/.claude/.credentials.json` as a read-only seed file:
+
+```yaml
+environment:
+  CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/tokens.json
+  CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
+volumes:
+  - ~/.claude/.credentials.json:/config/credentials.json:ro
+  - claude-oauth-data:/data
+```
+
+The proxy reads the seed on first start, then writes refreshed tokens to a separate writable path. Your Claude CLI credentials are never modified. See `docs/deploy/docker-compose.md` for a complete example.
+
 ## Local Binary
 
 Build the binary:

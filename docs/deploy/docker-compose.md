@@ -67,6 +67,41 @@ volumes:
 
 The container then reuses your existing Claude session and skips the login flow on startup.
 
+## Reusing Claude CLI Credentials
+
+If you use the Claude CLI (`claude`) and have already authenticated, you can reuse those credentials directly. The proxy understands the Claude CLI's credential format (`~/.claude/.credentials.json`) and converts it automatically.
+
+Mount the file read-only as a seed, and let the proxy write refreshed tokens to a separate volume:
+
+```yaml
+services:
+  claude-oauth-proxy:
+    image: ghcr.io/bonztm/claude-oauth-proxy:${CLAUDE_OAUTH_PROXY_IMAGE_TAG:-latest}
+    container_name: claude-oauth-proxy
+    restart: unless-stopped
+    command:
+      - serve
+    ports:
+      - "9999:9999"
+    environment:
+      CLAUDE_OAUTH_PROXY_API_KEY: ${CLAUDE_OAUTH_PROXY_API_KEY:-sk-proxy-local-key}
+      CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/tokens.json
+      CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
+    volumes:
+      - ~/.claude/.credentials.json:/config/credentials.json:ro
+      - claude-oauth-data:/data
+
+volumes:
+  claude-oauth-data:
+```
+
+How this works:
+
+- on first start, the proxy reads your Claude CLI credentials from the read-only seed file
+- after the first token refresh, refreshed tokens are saved to `/data/tokens.json` on the writable volume
+- your host `~/.claude/.credentials.json` is never modified
+- if the writable token file is removed, the proxy falls back to the seed again
+
 ## API Key And Client Settings
 
 The example Compose setup expects a local API key. By default the example uses:

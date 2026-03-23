@@ -10,5 +10,15 @@ services:
     environment:
       CLAUDE_OAUTH_PROXY_API_KEY: ${CLAUDE_OAUTH_PROXY_API_KEY:-sk-proxy-local-key}
       CLAUDE_OAUTH_PROXY_TOKEN_FILE: /config/tokens.json
+      # To reuse Claude CLI credentials, uncomment the next line and the
+      # volume mount below, then change TOKEN_FILE to /data/tokens.json:
+      # CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
     volumes:
       - ./runtime:/config
+      # To reuse Claude CLI credentials (read-only seed):
+      # - ~/.claude/.credentials.json:/config/credentials.json:ro
+      # - claude-oauth-data:/data
+
+# Uncomment if using Claude CLI credential seeding:
+# volumes:
+#   claude-oauth-data:

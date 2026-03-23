@@ -29,6 +29,7 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_REQUEST_TIMEOUT` | `10m` | Reserved request timeout config |
 | `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` | `1m` | Reserved refresh interval config |
 | `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` | `5m` | Refresh-before-expiry skew |
+| `CLAUDE_OAUTH_PROXY_SEED_FILE` | unset | Read-only seed token file (e.g. Claude CLI credentials) |
 
 ## Flags
 
@@ -86,6 +87,19 @@ The file is written with `0600` permissions and contains:
 - scope
 - expiry time
 
+## Seed File
+
+When `CLAUDE_OAUTH_PROXY_SEED_FILE` is set, the proxy reads initial credentials from that file but writes refreshed tokens to `CLAUDE_OAUTH_PROXY_TOKEN_FILE`. This is useful for mounting a read-only credential file (such as the Claude CLI's `~/.claude/.credentials.json`) without the proxy overwriting it.
+
+The token file format from the Claude CLI (`{"claudeAiOauth": {"accessToken": ..., "expiresAt": <unix>}}`) is detected and converted automatically. No format conversion is needed on your part.
+
+Load order:
+
+1. try the primary token file (`CLAUDE_OAUTH_PROXY_TOKEN_FILE`)
+2. if that file does not exist, fall back to the seed file (`CLAUDE_OAUTH_PROXY_SEED_FILE`)
+
+Once the proxy refreshes tokens, they are saved to the primary token file and the seed is not read again until the primary is removed.
+
 ## Practical Examples
 
 Use a custom local key and port:
@@ -115,6 +129,7 @@ Docker Compose users usually set:
 
 - `CLAUDE_OAUTH_PROXY_API_KEY`
 - `CLAUDE_OAUTH_PROXY_TOKEN_FILE=/config/tokens.json`
+- `CLAUDE_OAUTH_PROXY_SEED_FILE=/config/credentials.json` (optional, when reusing Claude CLI credentials)
 
 Helm users usually set:
 
