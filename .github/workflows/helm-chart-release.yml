@@ -7,20 +7,21 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release tag without v prefix, for example 1.2.3
+        description: "Release tag (for example 1.0.0)"
         required: true
         type: string
 
 permissions:
   contents: write
+  packages: read
 
 concurrency:
-  group: helm-chart-release-${{ github.ref_name || github.run_id }}
+  group: helm-chart-release-${{ github.event.release.tag_name || inputs.release_tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   publish-helm-chart:
-    name: Package And Publish Helm Chart
+    name: Package and Publish Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,52 +29,114 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Up Helm
-        uses: azure/setup-helm@v4
-
-      - name: Resolve Chart Metadata
+      - name: Resolve Release Metadata
         id: meta
         shell: bash
         run: |
           set -euo pipefail
 
-          chart_dir="charts/claude-oauth-proxy"
-          chart_version="$(awk '/^version:/ {print $2; exit}' "${chart_dir}/Chart.yaml")"
-          repo_owner_lower="${GITHUB_REPOSITORY_OWNER,,}"
-          repo_name="${GITHUB_REPOSITORY#*/}"
-          helm_repo_url="https://${repo_owner_lower}.github.io/${repo_name}"
           if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
-            release_tag="${{ github.event.release.tag_name }}"
+            RELEASE_TAG="${{ github.event.release.tag_name }}"
           else
-            release_tag="${{ inputs.release_tag }}"
+            RELEASE_TAG="${{ inputs.release_tag }}"
           fi
 
-          if [[ "${release_tag}" == v* ]]; then
-            echo "Release tags must be plain semantic versions without a v prefix." >&2
+          RELEASE_TAG="$(echo "${RELEASE_TAG}" | xargs)"
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "Release tag is required." >&2
             exit 1
           fi
-          if ! [[ "${release_tag}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Release tags must use semantic versioning, for example 1.2.3 or 1.2.3-rc.1." >&2
+          if [[ "${RELEASE_TAG}" == v* ]]; then
+            echo "Release tags must be plain semantic versions without a 'v' prefix (example: 1.0.0)." >&2
             exit 1
           fi
+          if ! [[ "${RELEASE_TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must be a semantic version (example: 1.0.0 or 1.0.0-rc.1)." >&2
+            exit 1
+          fi
+
+          REPO_OWNER_LOWER="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          HELM_REPO_URL="https://${REPO_OWNER_LOWER}.github.io/${REPO_NAME}"
 
           {
-            echo "chart_dir=${chart_dir}"
-            echo "chart_version=${chart_version}"
-            echo "helm_repo_url=${helm_repo_url}"
-            echo "release_tag=${release_tag}"
-          } >> "$GITHUB_OUTPUT"
+            echo "release_tag=${RELEASE_TAG}"
+            echo "repo_owner_lower=${REPO_OWNER_LOWER}"
+            echo "helm_repo_url=${HELM_REPO_URL}"
+          } >> "${GITHUB_OUTPUT}"
 
-          if [ "${release_tag}" != "${chart_version}" ]; then
-            echo "Chart version ${chart_version} must match release tag ${release_tag}." >&2
-            exit 1
-          fi
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lint Chart
-        run: helm lint "${{ steps.meta.outputs.chart_dir }}"
+      - name: Wait for Release Image in GHCR
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          REPO_OWNER_LOWER: ${{ steps.meta.outputs.repo_owner_lower }}
+        run: |
+          set -euo pipefail
 
-      - name: Render Chart
-        run: helm template claude-oauth-proxy "${{ steps.meta.outputs.chart_dir }}" >/dev/null
+          image_ref="ghcr.io/${REPO_OWNER_LOWER}/claude-oauth-proxy:${RELEASE_TAG}"
+          max_wait_seconds=1800
+          poll_interval_seconds=20
+          deadline=$(( $(date +%s) + max_wait_seconds ))
+
+          echo "Waiting for ${image_ref}..."
+
+          while true; do
+            if docker manifest inspect "${image_ref}" >/dev/null 2>&1; then
+              echo "Found ${image_ref}"
+              break
+            fi
+
+            now="$(date +%s)"
+            if [ "${now}" -ge "${deadline}" ]; then
+              echo "Timed out waiting for ${image_ref} after ${max_wait_seconds}s." >&2
+              exit 1
+            fi
+
+            remaining="$(( deadline - now ))"
+            echo "Still waiting for ${image_ref} (${remaining}s remaining)..."
+            sleep "${poll_interval_seconds}"
+          done
+
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Prepare Chart Release Workspace
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          rm -rf .chart-build
+          mkdir -p .chart-build
+          cp -R charts/claude-oauth-proxy .chart-build/claude-oauth-proxy
+
+          chart_yaml=".chart-build/claude-oauth-proxy/Chart.yaml"
+          values_yaml=".chart-build/claude-oauth-proxy/values.yaml"
+
+          # Stamp Chart.yaml with release version and appVersion.
+          sed -i "s/^version:.*$/version: ${RELEASE_TAG}/" "${chart_yaml}"
+          sed -i "s/^appVersion:.*$/appVersion: \"${RELEASE_TAG}\"/" "${chart_yaml}"
+
+          # Stamp values.yaml image tag.
+          sed -i "s/^  tag:.*$/  tag: ${RELEASE_TAG}/" "${values_yaml}"
+
+          echo "Stamped chart: version=${RELEASE_TAG}, appVersion=${RELEASE_TAG}, image.tag=${RELEASE_TAG}"
+          grep -E '^(version|appVersion):' "${chart_yaml}"
+          grep '  tag:' "${values_yaml}"
+
+      - name: Lint Release Chart
+        run: helm lint .chart-build/claude-oauth-proxy
+
+      - name: Render Release Chart
+        run: helm template claude-oauth-proxy .chart-build/claude-oauth-proxy >/dev/null
 
       - name: Prepare Existing Chart Artifacts
         shell: bash
@@ -88,6 +151,7 @@ jobs:
             git --work-tree=.chart-repo checkout origin/gh-pages -- .
           fi
 
+          # Keep only chart repository artifacts on gh-pages.
           find .chart-repo -mindepth 1 -maxdepth 1 \
             ! -name '.git' \
             ! -name '*.tgz' \
@@ -95,17 +159,12 @@ jobs:
             ! -name '.nojekyll' \
             -exec rm -rf {} +
 
-          if [ -f ".chart-repo/claude-oauth-proxy-${{ steps.meta.outputs.chart_version }}.tgz" ]; then
-            echo "Chart version ${{ steps.meta.outputs.chart_version }} is already published." >&2
-            exit 1
-          fi
-
-      - name: Package Chart And Build Index
+      - name: Package Chart and Build Index
         shell: bash
         run: |
           set -euo pipefail
 
-          helm package "${{ steps.meta.outputs.chart_dir }}" --destination .chart-repo
+          helm package .chart-build/claude-oauth-proxy --destination .chart-repo
 
           if [ -f .chart-repo/index.yaml ]; then
             helm repo index .chart-repo \
@@ -125,4 +184,4 @@ jobs:
           publish_dir: .chart-repo
           keep_files: false
           enable_jekyll: false
-          commit_message: "chore(helm): publish chart ${{ steps.meta.outputs.chart_version }}"
+          commit_message: "chore(helm): publish chart for ${{ steps.meta.outputs.release_tag }}"
