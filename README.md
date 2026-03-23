@@ -321,12 +321,21 @@ claude-oauth-proxy version
 
 ## Where To Go Next
 
-- Docker Compose guide: `docs/deploy/docker-compose.md`
-- Kubernetes/Helm guide: `docs/deploy/kubernetes.md`
-- Configuration reference: `docs/configuration.md`
-- Prompt caching: `docs/caching.md`
-- Helm chart details: `charts/claude-oauth-proxy/README.md`
-- Testing and validation: `docs/testing.md`
+**Guides:**
+
+- [Docker Compose deployment](docs/deploy/docker-compose.md)
+- [Kubernetes / Helm deployment](docs/deploy/kubernetes.md)
+- [Configuration reference](docs/configuration.md)
+- [Prompt caching](docs/caching.md)
+- [Helm chart details](charts/claude-oauth-proxy/README.md)
+- [Testing and validation](docs/testing.md)
+
+**Community:**
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## Development
 

@@ -139,3 +139,7 @@ helm upgrade claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy -n claude-
 ```bash
 helm uninstall claude-oauth-proxy -n claude-oauth-proxy
 ```
+
+---
+
+**See also:** [README](../../README.md) · [Kubernetes deployment guide](../../docs/deploy/kubernetes.md) · [Configuration reference](../../docs/configuration.md)

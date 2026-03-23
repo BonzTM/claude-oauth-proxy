@@ -102,3 +102,7 @@ helm upgrade --install claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy 
 - `GET /readyz` is the readiness endpoint
 - keep the token volume writable so refreshes can be persisted
 - if you rotate the local API key, update clients to match
+
+---
+
+**See also:** [README](../../README.md) · [Docker Compose deployment](docker-compose.md) · [Helm chart details](../../charts/claude-oauth-proxy/README.md) · [Configuration reference](../configuration.md)

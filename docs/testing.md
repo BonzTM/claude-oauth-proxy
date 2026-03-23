@@ -94,3 +94,7 @@ curl http://127.0.0.1:9999/v1/chat/completions \
     ]
   }'
 ```
+
+---
+
+**See also:** [README](../README.md) · [Configuration reference](configuration.md) · [Prompt caching](caching.md) · [Contributing](../CONTRIBUTING.md)

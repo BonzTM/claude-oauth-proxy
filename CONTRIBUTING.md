@@ -62,6 +62,14 @@ All development happens on the `main` branch:
 - `internal/auth/` manages the OAuth token lifecycle — refresh, persistence, and the seed file fallback.
 - Changes to the Anthropic SDK integration should verify cache breakpoint behavior and streaming tool call translation.
 
+## Community
+
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating. To report security vulnerabilities, see the [Security Policy](SECURITY.md).
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+
+---
+
+**See also:** [README](README.md) · [Testing](docs/testing.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Security Policy](SECURITY.md)

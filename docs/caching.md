@@ -69,3 +69,7 @@ For a typical multi-turn conversation with tools:
 | Nth request | Everything up to the (N-1)th user message is read from cache |
 
 The cache has a 5-minute TTL on Anthropic's side. As long as requests arrive within that window, cached prefixes are reused.
+
+---
+
+**See also:** [README](../README.md) · [Configuration reference](configuration.md) · [Testing](testing.md)

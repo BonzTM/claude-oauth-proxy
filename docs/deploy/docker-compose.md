@@ -137,3 +137,7 @@ curl -sf http://127.0.0.1:9999/readyz
 - keep the mounted token directory writable so refreshes can be saved
 - do not bake live OAuth tokens into the image
 - treat the mounted runtime directory as sensitive data
+
+---
+
+**See also:** [README](../../README.md) · [Kubernetes / Helm deployment](kubernetes.md) · [Configuration reference](../configuration.md) · [Prompt caching](../caching.md)

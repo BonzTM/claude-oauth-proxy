@@ -181,3 +181,7 @@ The proxy keeps tokens fresh through two mechanisms:
 **Background refresh**: a goroutine ticks every `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` (default 1 minute) and calls `AccessToken`. If the token is within `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` (default 5 minutes) of expiry, a refresh is triggered. This means tokens are typically refreshed 5 minutes before they expire.
 
 **401 retry**: if an upstream Anthropic request returns HTTP 401, the proxy immediately retries with a forced token refresh. This handles edge cases where a token expires between the background check and the actual request. Clients see a slightly slower response but never an auth error under normal conditions.
+
+---
+
+**See also:** [README](../README.md) · [Prompt caching](caching.md) · [Docker Compose](deploy/docker-compose.md) · [Kubernetes / Helm](deploy/kubernetes.md) · [Testing](testing.md)
