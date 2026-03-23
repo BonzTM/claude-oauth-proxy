@@ -147,9 +147,7 @@ func (s *service) PrepareLogin(ctx context.Context, input PrepareLoginInput) (Pr
 		return PrepareLoginOutput{}, apiErr
 	}
 	if input.OpenBrowser && s.opener != nil {
-		if err := s.opener.Open(authURL); err != nil {
-			return PrepareLoginOutput{}, core.NewError("BROWSER_OPEN_FAILED", http.StatusBadGateway, "open browser", err)
-		}
+		_ = s.opener.Open(authURL) // best-effort; URL is always printed for manual use
 	}
 	return PrepareLoginOutput{AuthURL: authURL, State: state, CodeVerifier: verifier}, nil
 }

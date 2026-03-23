@@ -167,8 +167,9 @@ func TestServiceErrorsAndRefreshRequirements(t *testing.T) {
 	opener := &fakeBrowserOpener{err: errors.New("open failed")}
 	service := NewService(Config{RedirectURI: "redirect", RefreshSkew: time.Minute}, store, provider, opener, func() time.Time { return now })
 
-	if _, apiErr := service.PrepareLogin(context.Background(), PrepareLoginInput{OpenBrowser: true}); apiErr == nil || apiErr.Code != "BROWSER_OPEN_FAILED" {
-		t.Fatalf("expected browser error, got %v", apiErr)
+	// Browser open failure is non-fatal; PrepareLogin should succeed even when opener fails.
+	if _, apiErr := service.PrepareLogin(context.Background(), PrepareLoginInput{OpenBrowser: true}); apiErr != nil {
+		t.Fatalf("expected no error when browser fails to open, got %v", apiErr)
 	}
 	if _, apiErr := service.CompleteLogin(context.Background(), CompleteLoginInput{}); apiErr == nil || apiErr.Code != "CODE_REQUIRED" {
 		t.Fatalf("expected code required error, got %v", apiErr)
