@@ -153,9 +153,10 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 					return chunk, nil
 				}
 			case ant.MessageStartEvent:
-				if msg := variant.Message; msg.Usage.InputTokens > 0 {
-					streamUsage.PromptTokens = int64(msg.Usage.InputTokens)
-					streamUsage.TotalTokens = int64(msg.Usage.InputTokens + msg.Usage.OutputTokens)
+				if msg := variant.Message; msg.Usage.InputTokens > 0 || msg.Usage.CacheCreationInputTokens > 0 || msg.Usage.CacheReadInputTokens > 0 {
+					totalInput := int64(msg.Usage.InputTokens) + msg.Usage.CacheCreationInputTokens + msg.Usage.CacheReadInputTokens
+					streamUsage.PromptTokens = totalInput
+					streamUsage.TotalTokens = totalInput + int64(msg.Usage.OutputTokens)
 					streamUsage.CacheCreationInputTokens = msg.Usage.CacheCreationInputTokens
 					streamUsage.CacheReadInputTokens = msg.Usage.CacheReadInputTokens
 				}
@@ -338,9 +339,10 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 	}
 	usage := openai.Usage{}
 	if message != nil {
-		usage.PromptTokens = message.Usage.InputTokens
+		totalInput := message.Usage.InputTokens + message.Usage.CacheCreationInputTokens + message.Usage.CacheReadInputTokens
+		usage.PromptTokens = totalInput
 		usage.CompletionTokens = message.Usage.OutputTokens
-		usage.TotalTokens = message.Usage.InputTokens + message.Usage.OutputTokens
+		usage.TotalTokens = totalInput + message.Usage.OutputTokens
 		usage.CacheCreationInputTokens = message.Usage.CacheCreationInputTokens
 		usage.CacheReadInputTokens = message.Usage.CacheReadInputTokens
 		if message.Usage.CacheReadInputTokens > 0 || message.Usage.CacheCreationInputTokens > 0 {
