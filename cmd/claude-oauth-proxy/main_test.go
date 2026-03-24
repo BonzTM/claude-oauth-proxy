@@ -26,6 +26,16 @@ func TestRunHelpAndVersion(t *testing.T) {
 	}
 }
 
+func TestRunUsesSignalContext(t *testing.T) {
+	// run() creates a signal.NotifyContext internally. Verify it still works
+	// for non-blocking commands like "help" that return immediately.
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"help"}, strings.NewReader(""), &stdout, &stderr); code != 0 {
+		t.Fatalf("unexpected exit code with signal context: %d", code)
+	}
+}
+
 func TestMainUsesExitFunc(t *testing.T) {
 	previousArgs := os.Args
 	previousExit := exitFunc

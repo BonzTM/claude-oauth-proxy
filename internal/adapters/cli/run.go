@@ -95,7 +95,9 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 			}
 		}
 	}
-	go autoRefresh(ctx, app.Auth, logger)
+	refreshCtx, refreshCancel := context.WithCancel(ctx)
+	defer refreshCancel()
+	go autoRefreshWithInterval(refreshCtx, app.Auth, logger, app.RefreshInterval)
 	server := &http.Server{Addr: baseConfig.ListenAddr, Handler: app.Handler, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
@@ -189,9 +191,8 @@ func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Re
 	if code == "" {
 		fmt.Fprintln(stdout, "after logging in, copy the ?code=... value from the redirect URL and paste it here:")
 		fmt.Fprint(stdout, "code: ")
-		reader := bufio.NewReader(stdin)
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
+		line, err := readLineWithContext(ctx, stdin)
+		if err != nil {
 			fmt.Fprintf(stderr, "failed to read oauth code: %v\n", err)
 			return 1
 		}
@@ -206,6 +207,29 @@ func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Re
 	fmt.Fprintf(stdout, "saved oauth session to %s\n", result.TokenPath)
 	fmt.Fprintf(stdout, "token expires at %s\n", result.ExpiresAt.Format(time.RFC3339))
 	return 0
+}
+
+func readLineWithContext(ctx context.Context, stdin io.Reader) (string, error) {
+	reader := bufio.NewReader(stdin)
+	type readResult struct {
+		line string
+		err  error
+	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			resultCh <- readResult{line: line}
+			return
+		}
+		resultCh <- readResult{line: line, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case result := <-resultCh:
+		return result.line, result.err
+	}
 }
 
 func normalizeCode(raw string) string {
@@ -230,11 +254,10 @@ func normalizeCode(raw string) string {
 	return strings.TrimSpace(trimmed)
 }
 
-func autoRefresh(ctx context.Context, authService auth.Service, logger logging.Logger) {
-	autoRefreshWithInterval(ctx, authService, logger, time.Minute)
-}
-
 func autoRefreshWithInterval(ctx context.Context, authService auth.Service, logger logging.Logger, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Minute
+	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var userHomeDir = os.UserHomeDir
@@ -26,6 +28,8 @@ const (
 	EnvRefreshInterval = "CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL"
 	EnvRefreshSkew     = "CLAUDE_OAUTH_PROXY_REFRESH_SKEW"
 	EnvSeedFile        = "CLAUDE_OAUTH_PROXY_SEED_FILE"
+	EnvCORSOrigins     = "CLAUDE_OAUTH_PROXY_CORS_ORIGINS"
+	EnvMaxRequestBody  = "CLAUDE_OAUTH_PROXY_MAX_REQUEST_BODY"
 	EnvCCVersion       = "CLAUDE_OAUTH_PROXY_CC_VERSION"
 	EnvCCUserAgent     = "CLAUDE_OAUTH_PROXY_CC_USER_AGENT"
 	EnvCCSDKVersion    = "CLAUDE_OAUTH_PROXY_CC_SDK_VERSION"
@@ -47,6 +51,8 @@ const (
 	DefaultRequestTimeout  = "10m"
 	DefaultRefreshInterval = "1m"
 	DefaultRefreshSkew     = "5m"
+	DefaultCORSOrigins     = ""
+	DefaultMaxRequestBody  = "10MB"
 	DefaultBillingHeader   = "x-anthropic-billing-header: cc_version=%s; cc_entrypoint=cli; cch=00000;"
 	DefaultCCVersion       = "2.1.81"
 	DefaultUserAgent       = "claude-cli/2.1.81 (external, cli)"
@@ -72,6 +78,8 @@ type Config struct {
 	RefreshInterval string
 	RefreshSkew     string
 	SeedFile        string
+	CORSOrigins     string
+	MaxRequestBody  string
 	CCVersion       string
 	CCUserAgent     string
 	CCSDKVersion    string
@@ -102,6 +110,8 @@ func DefaultConfig() Config {
 		RequestTimeout:  DefaultRequestTimeout,
 		RefreshInterval: DefaultRefreshInterval,
 		RefreshSkew:     DefaultRefreshSkew,
+		CORSOrigins:     DefaultCORSOrigins,
+		MaxRequestBody:  DefaultMaxRequestBody,
 	}
 }
 
@@ -138,6 +148,8 @@ func configFromEnv(getenv func(string) string, tokenFile func() string) Config {
 	apply(getenv(EnvRefreshInterval), &cfg.RefreshInterval)
 	apply(getenv(EnvRefreshSkew), &cfg.RefreshSkew)
 	apply(getenv(EnvSeedFile), &cfg.SeedFile)
+	apply(getenv(EnvCORSOrigins), &cfg.CORSOrigins)
+	apply(getenv(EnvMaxRequestBody), &cfg.MaxRequestBody)
 	apply(getenv(EnvCCVersion), &cfg.CCVersion)
 	apply(getenv(EnvCCUserAgent), &cfg.CCUserAgent)
 	apply(getenv(EnvCCSDKVersion), &cfg.CCSDKVersion)
@@ -165,7 +177,49 @@ func (c Config) Validate() error {
 			return fmt.Errorf("%s must not be empty", label)
 		}
 	}
+	for label, value := range map[string]string{
+		"request timeout":  c.RequestTimeout,
+		"refresh interval": c.RefreshInterval,
+		"refresh skew":     c.RefreshSkew,
+	} {
+		if _, err := time.ParseDuration(value); err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+	}
+	if _, err := ParseByteSize(c.MaxRequestBody); err != nil {
+		return fmt.Errorf("max request body: %w", err)
+	}
 	return nil
+}
+
+func ParseByteSize(raw string) (int64, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return 0, fmt.Errorf("empty value")
+	}
+	s = strings.ToUpper(s)
+	var multiplier int64 = 1
+	switch {
+	case strings.HasSuffix(s, "GB"):
+		multiplier = 1024 * 1024 * 1024
+		s = strings.TrimSuffix(s, "GB")
+	case strings.HasSuffix(s, "MB"):
+		multiplier = 1024 * 1024
+		s = strings.TrimSuffix(s, "MB")
+	case strings.HasSuffix(s, "KB"):
+		multiplier = 1024
+		s = strings.TrimSuffix(s, "KB")
+	case strings.HasSuffix(s, "B"):
+		s = strings.TrimSuffix(s, "B")
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid byte size %q: %w", raw, err)
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("byte size must be positive, got %d", n)
+	}
+	return n * multiplier, nil
 }
 
 func defaultTokenFile() string {

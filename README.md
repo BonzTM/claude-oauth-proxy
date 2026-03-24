@@ -160,8 +160,8 @@ More detail: `docs/deploy/kubernetes.md`
 - refreshes tokens automatically while the proxy is running
 - retries transparently on 401 with a forced token refresh
 - supports:
-  - `GET /v1/models`
-  - `POST /v1/chat/completions` (streaming and non-streaming)
+  - `GET /v1/models` (unauthenticated — allows client model discovery without credentials)
+  - `POST /v1/chat/completions` (streaming and non-streaming, requires API key)
 - exposes health endpoints:
   - `GET /health`
   - `GET /healthz`

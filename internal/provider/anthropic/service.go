@@ -33,6 +33,7 @@ type Config struct {
 	RuntimeVersion string
 	StainlessOS    string
 	StainlessArch  string
+	RequestTimeout time.Duration
 	HTTPClient     *http.Client
 	Now            func() time.Time
 }
@@ -58,13 +59,17 @@ func (s *service) ListModels(ctx context.Context, _ provider.ListModelsInput) (p
 	if apiErr != nil {
 		return provider.ListModelsOutput{}, apiErr
 	}
-	out, err := s.fetchModels(ctx, client)
+	callCtx, cancel := s.withRequestTimeout(ctx)
+	out, err := s.fetchModels(callCtx, client)
+	cancel()
 	if unauthorized(err) {
 		client, apiErr = s.client(ctx, true)
 		if apiErr != nil {
 			return provider.ListModelsOutput{}, apiErr
 		}
-		out, err = s.fetchModels(ctx, client)
+		callCtx, cancel = s.withRequestTimeout(ctx)
+		out, err = s.fetchModels(callCtx, client)
+		cancel()
 	}
 	if err != nil {
 		return provider.ListModelsOutput{}, translateError("list anthropic models", err)
@@ -81,13 +86,17 @@ func (s *service) CreateChatCompletion(ctx context.Context, input provider.Creat
 	if apiErr != nil {
 		return provider.CreateChatCompletionOutput{}, apiErr
 	}
-	response, err := client.Messages.New(ctx, params)
+	callCtx, cancel := s.withRequestTimeout(ctx)
+	response, err := client.Messages.New(callCtx, params)
+	cancel()
 	if unauthorized(err) {
 		client, apiErr = s.client(ctx, true)
 		if apiErr != nil {
 			return provider.CreateChatCompletionOutput{}, apiErr
 		}
-		response, err = client.Messages.New(ctx, params)
+		callCtx, cancel = s.withRequestTimeout(ctx)
+		response, err = client.Messages.New(callCtx, params)
+		cancel()
 	}
 	if err != nil {
 		return provider.CreateChatCompletionOutput{}, translateError("create anthropic message", err)
@@ -123,7 +132,7 @@ func (s *service) CreateChatCompletionStream(ctx context.Context, input provider
 			streamUsage.PromptTokensDetails = &openai.PromptTokensDetails{CachedTokens: streamUsage.CacheReadInputTokens}
 		}
 		if streamThinkingChars > 0 {
-			streamUsage.CompletionTokensDetails = &openai.CompletionTokensDetails{ReasoningTokens: (streamThinkingChars + 3) / 4}
+			streamUsage.CompletionTokensDetails = &openai.CompletionTokensDetails{ReasoningTokens: estimateThinkingTokens(streamThinkingChars)}
 		}
 		return openai.ChatCompletionChunk{ID: chunkID, Object: "chat.completion.chunk", Created: s.cfg.Now().Unix(), Model: input.Request.Model, Choices: []openai.ChatCompletionChunkChoice{{Index: 0, Delta: openai.ChatCompletionDelta{}, FinishReason: &finish}}, Usage: &streamUsage}
 	}
@@ -214,6 +223,13 @@ func (s *service) client(ctx context.Context, forceRefresh bool) (ant.Client, *c
 		option.WithHeader("X-Stainless-Arch", s.cfg.StainlessArch),
 		option.WithHeader("x-app", "cli"),
 	), nil
+}
+
+func (s *service) withRequestTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.cfg.RequestTimeout <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, s.cfg.RequestTimeout)
 }
 
 func (s *service) fetchModels(ctx context.Context, client ant.Client) (openai.ModelsResponse, error) {
@@ -373,8 +389,7 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 			case "text":
 				content += block.Text
 			case "thinking":
-				// Estimate thinking tokens: ~4 chars per token is a rough heuristic.
-				thinkingTokens += int64(len(block.Thinking)+3) / 4
+				thinkingTokens += estimateThinkingTokens(int64(len(block.Thinking)))
 			case "tool_use":
 				args, _ := json.Marshal(block.Input)
 				toolCalls = append(toolCalls, openai.ToolCall{ID: block.ID, Type: "function", Function: openai.FunctionCall{Name: block.Name, Arguments: string(args)}})
@@ -404,6 +419,13 @@ func mapResponse(model string, message *ant.Message, createdAt time.Time) openai
 	}
 	msg := openai.ChatCompletionMessage{Role: "assistant", Content: openai.MessageContent{Text: content}, ToolCalls: toolCalls}
 	return openai.ChatCompletionResponse{ID: fmt.Sprintf("chatcmpl-%d", createdAt.UnixNano()), Object: "chat.completion", Created: createdAt.Unix(), Model: model, Choices: []openai.ChatCompletionChoice{{Index: 0, Message: msg, FinishReason: finishReason}}, Usage: usage}
+}
+
+func estimateThinkingTokens(chars int64) int64 {
+	if chars <= 0 {
+		return 0
+	}
+	return (chars + 3) / 4
 }
 
 func unauthorized(err error) bool {

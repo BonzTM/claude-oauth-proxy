@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -62,7 +63,7 @@ func TestRunCommandsAndNormalizeCode(t *testing.T) {
 		accessOut:   auth.AccessTokenOutput{Token: "token"},
 	}
 	factory := func(cfg runtime.Config, logger logging.Logger) (runtime.App, error) {
-		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })}, nil
+		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) }), RefreshInterval: time.Minute}, nil
 	}
 	baseConfig := runtime.DefaultConfig()
 	baseConfig.ListenAddr = "bad address"
@@ -126,7 +127,7 @@ func TestRunErrorsFromFactoryAndAuth(t *testing.T) {
 	}
 	authService := &fakeAuthService{prepareErr: core.NewError("PREPARE_FAILED", http.StatusBadGateway, "prepare failed", nil), statusErr: core.NewError("STATUS_FAILED", http.StatusInternalServerError, "status failed", nil), logoutErr: core.NewError("LOGOUT_FAILED", http.StatusInternalServerError, "logout failed", nil)}
 	factory := func(cfg runtime.Config, logger logging.Logger) (runtime.App, error) {
-		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})}, nil
+		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), RefreshInterval: time.Minute}, nil
 	}
 	stdout.Reset()
 	stderr.Reset()
@@ -154,7 +155,7 @@ func TestRunErrorsFromFactoryAndAuth(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	autoRefreshWithInterval(ctx, authService, logging.NewRecorder(), time.Millisecond)
-	autoRefresh(ctx, authService, logging.NewRecorder())
+	autoRefreshWithInterval(ctx, authService, logging.NewRecorder(), 0)
 }
 
 func TestDirectCLIHelpers(t *testing.T) {
@@ -162,7 +163,7 @@ func TestDirectCLIHelpers(t *testing.T) {
 	baseConfig.ListenAddr = "bad address"
 	authService := &fakeAuthService{prepareOut: auth.PrepareLoginOutput{AuthURL: "https://claude.ai/oauth/authorize", State: "state", CodeVerifier: "verifier"}, completeOut: auth.CompleteLoginOutput{TokenPath: "/tmp/tokens.json", ExpiresAt: time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)}, statusOut: auth.StatusOutput{TokenPath: "/tmp/tokens.json", Exists: false}, logoutOut: auth.LogoutOutput{TokenPath: "/tmp/tokens.json"}, accessErr: core.NewError("TOKEN_FAILED", http.StatusServiceUnavailable, "token failed", nil)}
 	factory := func(cfg runtime.Config, logger logging.Logger) (runtime.App, error) {
-		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})}, nil
+		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), RefreshInterval: time.Minute}, nil
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -206,7 +207,7 @@ func TestDirectCLIHelpers(t *testing.T) {
 	successConfig := runtime.DefaultConfig()
 	successConfig.ListenAddr = "127.0.0.1:0"
 	successFactory := func(cfg runtime.Config, logger logging.Logger) (runtime.App, error) {
-		return runtime.App{Config: cfg, Auth: &fakeAuthService{statusOut: auth.StatusOutput{TokenPath: "/tmp/tokens.json", Exists: true}, accessOut: auth.AccessTokenOutput{Token: "token"}}, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) })}, nil
+		return runtime.App{Config: cfg, Auth: &fakeAuthService{statusOut: auth.StatusOutput{TokenPath: "/tmp/tokens.json", Exists: true}, accessOut: auth.AccessTokenOutput{Token: "token"}}, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok")) }), RefreshInterval: time.Minute}, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -223,5 +224,32 @@ func TestDirectCLIHelpers(t *testing.T) {
 	configForFactory.TokenFile = t.TempDir() + "/tokens.json"
 	if _, err := defaultFactory(configForFactory, logging.NewRecorder()); err != nil {
 		t.Fatalf("unexpected default factory error: %v", err)
+	}
+}
+
+func TestExecuteLoginFlowReturnsOnContextCancel(t *testing.T) {
+	authService := &fakeAuthService{prepareOut: auth.PrepareLoginOutput{AuthURL: "https://claude.ai/oauth/authorize", State: "state", CodeVerifier: "verifier"}}
+	stdinReader, stdinWriter := io.Pipe()
+	defer stdinWriter.Close()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	go func() {
+		done <- executeLoginFlow(ctx, authService, stdinReader, &stdout, &stderr, false, "")
+	}()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+	stdinWriter.Close()
+	select {
+	case code := <-done:
+		if code != 1 {
+			t.Fatalf("expected canceled login flow to return 1, got %d", code)
+		}
+		if !strings.Contains(stderr.String(), "failed to read oauth code") {
+			t.Fatalf("expected read error output, got stderr=%q", stderr.String())
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("executeLoginFlow did not return after context cancellation")
 	}
 }

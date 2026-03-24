@@ -24,6 +24,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Static Analysis
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
       - name: Set Up Helm
         uses: azure/setup-helm@v4
 

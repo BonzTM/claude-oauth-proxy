@@ -2,6 +2,8 @@ package httpadapter
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,29 +17,55 @@ import (
 	"github.com/bonztm/claude-oauth-proxy/internal/provider"
 )
 
-type Handler struct {
-	provider provider.Service
-	auth     auth.Service
-	apiKey   string
-	logger   logging.Logger
-	now      func() time.Time
+type contextKey string
+
+const requestIDKey contextKey = "request_id"
+
+type HandlerConfig struct {
+	CORSOrigins    string
+	MaxRequestBody int64
 }
 
-func NewHandler(provider provider.Service, authService auth.Service, apiKey string, logger logging.Logger, now func() time.Time) http.Handler {
+type Handler struct {
+	provider       provider.Service
+	auth           auth.Service
+	apiKey         string
+	logger         logging.Logger
+	now            func() time.Time
+	corsOrigins    []string
+	maxRequestBody int64
+}
+
+func NewHandler(provider provider.Service, authService auth.Service, apiKey string, logger logging.Logger, now func() time.Time, cfg HandlerConfig) http.Handler {
 	if now == nil {
 		now = time.Now
 	}
-	h := &Handler{provider: provider, auth: authService, apiKey: apiKey, logger: logging.Normalize(logger), now: now}
+	var origins []string
+	if strings.TrimSpace(cfg.CORSOrigins) != "" {
+		for _, o := range strings.Split(cfg.CORSOrigins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+	}
+	maxBody := cfg.MaxRequestBody
+	if maxBody <= 0 {
+		maxBody = 10 * 1024 * 1024
+	}
+	h := &Handler{provider: provider, auth: authService, apiKey: apiKey, logger: logging.Normalize(logger), now: now, corsOrigins: origins, maxRequestBody: maxBody}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.handleHealth)
 	mux.HandleFunc("/healthz", h.handleHealth)
 	mux.HandleFunc("/livez", h.handleHealth)
 	mux.HandleFunc("/ready", h.handleReady)
 	mux.HandleFunc("/readyz", h.handleReady)
+	// NOTE: /v1/models is intentionally unauthenticated to allow client model
+	// discovery without credentials. This matches common proxy conventions where
+	// model listing is a read-only metadata operation.
 	mux.HandleFunc("/v1/models", h.handleModels)
 	mux.Handle("/v1/chat/completions", h.requireAPIKey(http.HandlerFunc(h.handleChatCompletions)))
 	mux.Handle("/v1/", h.requireAPIKey(http.HandlerFunc(h.handleUnsupportedEndpoint)))
-	return h.withRequestLogging(mux)
+	return h.withRequestID(h.withCORS(h.withRequestLogging(mux)))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -67,6 +95,7 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBody)
 	defer r.Body.Close()
 	var request openai.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -109,10 +138,12 @@ func (h *Handler) handleStreamingChatCompletions(w http.ResponseWriter, r *http.
 				flusher.Flush()
 				return
 			}
+			h.logger.Error(r.Context(), "stream.error", "error", err.Error())
 			return
 		}
 		data, marshalErr := json.Marshal(chunk)
 		if marshalErr != nil {
+			h.logger.Error(r.Context(), "stream.marshal_error", "error", marshalErr.Error())
 			return
 		}
 		_, _ = w.Write([]byte("data: "))
@@ -140,17 +171,70 @@ func (h *Handler) requireAPIKey(next http.Handler) http.Handler {
 	})
 }
 
+var generateRequestID = func() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "unknown"
+	}
+	return hex.EncodeToString(b)
+}
+
+func (h *Handler) withRequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimSpace(r.Header.Get("X-Request-ID"))
+		if id == "" {
+			id = generateRequestID()
+		}
+		ctx := context.WithValue(r.Context(), requestIDKey, id)
+		w.Header().Set("X-Request-ID", id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *Handler) withCORS(next http.Handler) http.Handler {
+	if len(h.corsOrigins) == 0 {
+		return next
+	}
+	allowed := make(map[string]bool, len(h.corsOrigins))
+	allowAll := false
+	for _, o := range h.corsOrigins {
+		if o == "*" {
+			allowAll = true
+		}
+		allowed[o] = true
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" && (allowAll || allowed[origin]) {
+			w.Header().Add("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-Key, X-Request-ID")
+			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			if r.Method == http.MethodOptions {
+				w.Header().Add("Vary", "Access-Control-Request-Method")
+				w.Header().Add("Vary", "Access-Control-Request-Headers")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (h *Handler) withRequestLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startedAt := h.now()
-		h.logger.Info(r.Context(), logging.EventHTTPRequestStart, "method", r.Method, "path", r.URL.Path)
+		requestID, _ := r.Context().Value(requestIDKey).(string)
+		h.logger.Info(r.Context(), logging.EventHTTPRequestStart, "method", r.Method, "path", r.URL.Path, "request_id", requestID)
 		capturingWriter := &statusCapturingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		next.ServeHTTP(capturingWriter, r)
-		fields := []any{"method", r.Method, "path", r.URL.Path, "status_code", capturingWriter.statusCode, "duration_ms", h.now().Sub(startedAt).Milliseconds()}
+		fields := []any{"method", r.Method, "path", r.URL.Path, "status_code", capturingWriter.statusCode, "duration_ms", h.now().Sub(startedAt).Milliseconds(), "request_id", requestID}
 		if capturingWriter.statusCode >= http.StatusBadRequest {
-			h.logger.Error(context.Background(), logging.EventHTTPRequestFinish, fields...)
+			h.logger.Error(r.Context(), logging.EventHTTPRequestFinish, fields...)
 		} else {
-			h.logger.Info(context.Background(), logging.EventHTTPRequestFinish, fields...)
+			h.logger.Info(r.Context(), logging.EventHTTPRequestFinish, fields...)
 		}
 	})
 }
