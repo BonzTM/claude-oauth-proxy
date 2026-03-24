@@ -6,11 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-03-24
+
 ### Added
+
+- Graceful shutdown via `SIGTERM`/`SIGINT` signal handling using `signal.NotifyContext`.
+- Request ID middleware — generates or propagates `X-Request-ID` headers and includes `request_id` in structured log entries.
+- Configurable CORS support via `CLAUDE_OAUTH_PROXY_CORS_ORIGINS` (comma-separated origins or `*`).
+- Configurable request body size limit via `CLAUDE_OAUTH_PROXY_MAX_REQUEST_BODY` (default `10MB`).
+- `http.MaxBytesReader` on `/v1/chat/completions` to reject oversized request bodies.
+- `go vet` and `golangci-lint` steps in CI pipeline.
+- Context-aware stdin reading during interactive login — Ctrl+C now exits the prompt reliably.
+- `estimateThinkingTokens` shared helper, replacing duplicated inline heuristic.
+
+### Fixed
+
+- `CLAUDE_OAUTH_PROXY_REQUEST_TIMEOUT` and `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` are now validated at startup and wired into the runtime. Previously these config fields were parsed but silently ignored.
+- Request timeout is applied per non-streaming API call via context deadline instead of `http.Client.Timeout`, preventing long SSE streams from being killed mid-flight.
+- Auto-refresh goroutine lifecycle is now tied to a cancellable context. Previously the goroutine would leak if the HTTP server failed to bind.
+- Streaming errors mid-flight are now logged (`stream.error`) instead of silently dropped.
+- Request finish logging now uses `r.Context()` instead of `context.Background()`, preserving request-scoped values.
+- CORS preflight from disallowed origins falls through to the route handler instead of returning a bare `204`.
+- CORS responses include `Vary: Origin` (and preflight adds `Vary: Access-Control-Request-Method, Access-Control-Request-Headers`) to prevent cross-origin cache mismatches.
+- `RefreshSkew` parse errors now include field context in the error message (`"refresh skew: ..."` instead of raw parse error).
 
 ### Changed
 
-### Fixed
+- `NewHandler` accepts a `HandlerConfig` struct for CORS and body-limit settings.
+- `App` struct exposes `RefreshInterval` as a parsed `time.Duration` so callers no longer need to re-parse the string.
+- `autoRefresh` wrapper removed; `autoRefreshWithInterval` used directly with the config-derived interval.
+- `/v1/models` endpoint documented as intentionally unauthenticated (code comment and README).
 
 ## [1.1.0] - 2026-03-23
 
@@ -65,6 +90,7 @@ Initial public release of claude-oauth-proxy.
 
 See [docs/release-notes/RELEASE_NOTES_1.0.0.md](docs/release-notes/RELEASE_NOTES_1.0.0.md) for the full release notes.
 
-[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BonzTM/claude-oauth-proxy/releases/tag/v1.0.0

@@ -30,6 +30,8 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` | `1m` | How often the background goroutine checks token freshness |
 | `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` | `5m` | Refresh token this long before it actually expires |
 | `CLAUDE_OAUTH_PROXY_SEED_FILE` | unset | Read-only seed token file (e.g. Claude CLI credentials) |
+| `CLAUDE_OAUTH_PROXY_CORS_ORIGINS` | unset (disabled) | Comma-separated allowed CORS origins, or `*` for all |
+| `CLAUDE_OAUTH_PROXY_MAX_REQUEST_BODY` | `10MB` | Maximum request body size (supports `KB`, `MB`, `GB` suffixes) |
 | `CLAUDE_OAUTH_PROXY_CC_VERSION` | `2.1.81` | Claude Code version for billing header and User-Agent |
 | `CLAUDE_OAUTH_PROXY_CC_USER_AGENT` | `claude-cli/2.1.81 (external, cli)` | User-Agent header sent upstream |
 | `CLAUDE_OAUTH_PROXY_CC_SDK_VERSION` | `0.74.0` | JS SDK version for X-Stainless-Package-Version header |
