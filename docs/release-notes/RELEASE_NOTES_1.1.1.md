@@ -75,5 +75,5 @@ None. All changes are backwards-compatible.
 
 ## Full Changelog
 
-- Compare changes: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.0...v1.1.1
-- Full changelog: https://github.com/BonzTM/claude-oauth-proxy/commits/v1.1.1
+- Compare changes: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.0...1.1.1
+- Full changelog: https://github.com/BonzTM/claude-oauth-proxy/commits/1.1.1

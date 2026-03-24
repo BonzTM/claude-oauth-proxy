@@ -81,4 +81,4 @@ Initial public release of **claude-oauth-proxy**, an OpenAI-compatible API proxy
 
 ## Full Changelog
 
-- https://github.com/BonzTM/claude-oauth-proxy/commits/v1.0.0
+- https://github.com/BonzTM/claude-oauth-proxy/commits/1.0.0
