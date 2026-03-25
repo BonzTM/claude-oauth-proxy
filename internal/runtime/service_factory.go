@@ -47,7 +47,7 @@ func NewAppWithLogger(cfg Config, logger logging.Logger) (App, error) {
 		store = tokens.NewFallbackStore(tokens.NewFileStore(cfg.TokenFile), tokens.NewFileStore(cfg.SeedFile))
 	}
 	authService := auth.WithLogging(auth.NewService(auth.Config{RedirectURI: cfg.OAuthRedirect, RefreshSkew: refreshSkew}, store, auth.NewClaudeOAuthProvider(&http.Client{Timeout: 15 * time.Second}, auth.ClaudeOAuthProviderConfig{AuthURL: cfg.OAuthAuthURL, TokenURL: cfg.OAuthTokenURL, ClientID: cfg.OAuthClientID, Scopes: cfg.OAuthScopes, RedirectURI: cfg.OAuthRedirect}, time.Now), auth.ExecBrowserOpener{}, time.Now), logger)
-	var providerService provider.Service = provider.WithLogging(antprovider.New(antprovider.Config{BaseURL: cfg.AnthropicBase, BetaHeader: cfg.AnthropicBeta, BillingHeader: cfg.BillingHeader, CCVersion: cfg.CCVersion, UserAgent: cfg.CCUserAgent, SDKVersion: cfg.CCSDKVersion, RuntimeVersion: cfg.CCRuntimeVer, StainlessOS: cfg.CCOS, StainlessArch: cfg.CCArch, RequestTimeout: requestTimeout, HTTPClient: &http.Client{}, Now: time.Now}, authService), logger)
+	providerService := provider.WithLogging(antprovider.New(antprovider.Config{BaseURL: cfg.AnthropicBase, BetaHeader: cfg.AnthropicBeta, BillingHeader: cfg.BillingHeader, CCVersion: cfg.CCVersion, UserAgent: cfg.CCUserAgent, SDKVersion: cfg.CCSDKVersion, RuntimeVersion: cfg.CCRuntimeVer, StainlessOS: cfg.CCOS, StainlessArch: cfg.CCArch, RequestTimeout: requestTimeout, HTTPClient: &http.Client{}, Now: time.Now}, authService), logger)
 	if cfg.CostTracking {
 		pricing := cost.NewOpenRouterSource(cfg.OpenRouterURL, nil)
 		providerService = cost.WithCostTracking(providerService, pricing, logger)
