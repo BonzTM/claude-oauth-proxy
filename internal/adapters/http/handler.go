@@ -97,7 +97,9 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, h.maxRequestBody)
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 	var request openai.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeError(w, core.NewError("INVALID_JSON", http.StatusBadRequest, "decode request body", err))
@@ -124,7 +126,9 @@ func (h *Handler) handleStreamingChatCompletions(w http.ResponseWriter, r *http.
 		writeError(w, apiErr)
 		return
 	}
-	defer result.Stream.Close()
+	defer func() {
+		_ = result.Stream.Close()
+	}()
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, core.NewError("STREAMING_UNAVAILABLE", http.StatusInternalServerError, "http flusher is unavailable", nil))
