@@ -194,7 +194,9 @@ func TestServiceErrorsAndRefreshRequirements(t *testing.T) {
 func TestClaudeOAuthProviderBuildsURLAndPostsTokens(t *testing.T) {
 	requests := make([]url.Values, 0, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() {
+			_ = r.Body.Close()
+		}()
 		var payload map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode payload: %v", err)

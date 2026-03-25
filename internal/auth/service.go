@@ -304,7 +304,9 @@ func (p *claudeOAuthProvider) postToken(ctx context.Context, body map[string]str
 	if err != nil {
 		return tokens.TokenSet{}, core.NewError("TOKEN_REQUEST_FAILED", http.StatusBadGateway, "execute oauth token request", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return tokens.TokenSet{}, core.NewError("TOKEN_RESPONSE_READ_FAILED", http.StatusBadGateway, "read oauth token response", err)
