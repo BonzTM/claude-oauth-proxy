@@ -51,7 +51,9 @@ func TestListModelsAndChatCompletion(t *testing.T) {
 			_, _ = w.Write([]byte(`{"data":[{"id":"claude-sonnet-test","display_name":"Claude Sonnet Test","created_at":"2026-03-22T12:00:00Z","type":"model","capabilities":{},"max_input_tokens":200000,"max_tokens":8192}],"has_more":false,"first_id":"claude-sonnet-test","last_id":"claude-sonnet-test"}`))
 		case "/v1/messages":
 			w.Header().Set("Content-Type", "application/json")
-			defer r.Body.Close()
+			defer func() {
+				_ = r.Body.Close()
+			}()
 			if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
 				t.Fatalf("decode request body: %v", err)
 			}
@@ -165,7 +167,9 @@ func TestCreateChatCompletionStreamMapsTextDeltas(t *testing.T) {
 	if apiErr != nil {
 		t.Fatalf("create chat completion stream: %v", apiErr)
 	}
-	defer result.Stream.Close()
+	defer func() {
+		_ = result.Stream.Close()
+	}()
 	chunkOne, err := result.Stream.Next()
 	if err != nil || chunkOne.Choices[0].Delta.Role != "assistant" || chunkOne.Choices[0].Delta.Content != "hello" {
 		t.Fatalf("unexpected first chunk: %+v err=%v", chunkOne, err)
@@ -195,7 +199,9 @@ func TestCreateChatCompletionStreamTranslatesStreamErrors(t *testing.T) {
 	if apiErr != nil {
 		t.Fatalf("unexpected stream creation error: %v", apiErr)
 	}
-	defer result.Stream.Close()
+	defer func() {
+		_ = result.Stream.Close()
+	}()
 	if _, err := result.Stream.Next(); err == nil || !strings.Contains(err.Error(), "stream anthropic message") {
 		t.Fatalf("expected translated stream error, got %v", err)
 	}
@@ -609,7 +615,9 @@ func TestStreamingWithToolUseAndUsageEvents(t *testing.T) {
 	if apiErr != nil {
 		t.Fatalf("create chat completion stream: %v", apiErr)
 	}
-	defer result.Stream.Close()
+	defer func() {
+		_ = result.Stream.Close()
+	}()
 
 	chunkOne, err := result.Stream.Next()
 	if err != nil {
