@@ -156,6 +156,19 @@ type Usage struct {
 	CompletionTokensDetails  *CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 	CacheCreationInputTokens int64                    `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadInputTokens     int64                    `json:"cache_read_input_tokens,omitempty"`
+	Cost                     *CostDetails             `json:"cost,omitempty"`
+}
+
+type CostDetails struct {
+	InputCost        float64 `json:"input_cost"`
+	OutputCost       float64 `json:"output_cost"`
+	CacheWriteCost   float64 `json:"cache_write_cost,omitempty"`
+	CacheReadCost    float64 `json:"cache_read_cost,omitempty"`
+	TotalCost        float64 `json:"total_cost"`
+	Currency         string  `json:"currency"`
+	Model            string  `json:"model"`
+	InputPricePer1M  float64 `json:"input_price_per_1m"`
+	OutputPricePer1M float64 `json:"output_price_per_1m"`
 }
 
 type PromptTokensDetails struct {

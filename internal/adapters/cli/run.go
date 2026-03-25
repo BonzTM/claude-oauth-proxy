@@ -65,11 +65,13 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 	relogin := fs.Bool("relogin", false, "force browser re-authentication before serving")
 	noBrowser := fs.Bool("no-browser", false, "print the Claude OAuth URL instead of opening a browser")
 	code := fs.String("code", "", "authorization code to complete login without prompting")
+	costTracking := fs.Bool("cost-tracking", baseConfig.CostTracking, "enable theoretical cost tracking via OpenRouter pricing")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	baseConfig.ListenAddr = *listenAddr
 	baseConfig.APIKey = *apiKey
+	baseConfig.CostTracking = *costTracking
 	app, err := factory(baseConfig, logger)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
@@ -280,7 +282,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "claude-oauth-proxy - OpenAI-compatible Claude OAuth proxy")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>]")
+	fmt.Fprintln(w, "  claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>] [--cost-tracking]")
 	fmt.Fprintln(w, "  claude-oauth-proxy login [--no-browser] [--code <code>]")
 	fmt.Fprintln(w, "  claude-oauth-proxy status")
 	fmt.Fprintln(w, "  claude-oauth-proxy logout")

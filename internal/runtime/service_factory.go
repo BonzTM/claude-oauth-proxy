@@ -1,12 +1,14 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	httpadapter "github.com/bonztm/claude-oauth-proxy/internal/adapters/http"
 	"github.com/bonztm/claude-oauth-proxy/internal/auth"
+	"github.com/bonztm/claude-oauth-proxy/internal/cost"
 	"github.com/bonztm/claude-oauth-proxy/internal/logging"
 	"github.com/bonztm/claude-oauth-proxy/internal/provider"
 	antprovider "github.com/bonztm/claude-oauth-proxy/internal/provider/anthropic"
@@ -46,7 +48,19 @@ func NewAppWithLogger(cfg Config, logger logging.Logger) (App, error) {
 		store = tokens.NewFallbackStore(tokens.NewFileStore(cfg.TokenFile), tokens.NewFileStore(cfg.SeedFile))
 	}
 	authService := auth.WithLogging(auth.NewService(auth.Config{RedirectURI: cfg.OAuthRedirect, RefreshSkew: refreshSkew}, store, auth.NewClaudeOAuthProvider(&http.Client{Timeout: 15 * time.Second}, auth.ClaudeOAuthProviderConfig{AuthURL: cfg.OAuthAuthURL, TokenURL: cfg.OAuthTokenURL, ClientID: cfg.OAuthClientID, Scopes: cfg.OAuthScopes, RedirectURI: cfg.OAuthRedirect}, time.Now), auth.ExecBrowserOpener{}, time.Now), logger)
-	providerService := provider.WithLogging(antprovider.New(antprovider.Config{BaseURL: cfg.AnthropicBase, BetaHeader: cfg.AnthropicBeta, BillingHeader: cfg.BillingHeader, CCVersion: cfg.CCVersion, UserAgent: cfg.CCUserAgent, SDKVersion: cfg.CCSDKVersion, RuntimeVersion: cfg.CCRuntimeVer, StainlessOS: cfg.CCOS, StainlessArch: cfg.CCArch, RequestTimeout: requestTimeout, HTTPClient: &http.Client{}, Now: time.Now}, authService), logger)
+	var providerService provider.Service = provider.WithLogging(antprovider.New(antprovider.Config{BaseURL: cfg.AnthropicBase, BetaHeader: cfg.AnthropicBeta, BillingHeader: cfg.BillingHeader, CCVersion: cfg.CCVersion, UserAgent: cfg.CCUserAgent, SDKVersion: cfg.CCSDKVersion, RuntimeVersion: cfg.CCRuntimeVer, StainlessOS: cfg.CCOS, StainlessArch: cfg.CCArch, RequestTimeout: requestTimeout, HTTPClient: &http.Client{}, Now: time.Now}, authService), logger)
+	if cfg.CostTracking {
+		pricing := cost.NewOpenRouterSource(cfg.OpenRouterURL, nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		if err := pricing.Fetch(ctx); err != nil {
+			cancel()
+			logger.Error(context.Background(), "cost.openrouter_fetch_failed", "error", err.Error())
+		} else {
+			cancel()
+			logger.Info(context.Background(), "cost.openrouter_loaded", "models", pricing.ModelCount())
+		}
+		providerService = cost.WithCostTracking(providerService, pricing, logger)
+	}
 	handler := httpadapter.NewHandler(providerService, authService, cfg.APIKey, logger, time.Now, httpadapter.HandlerConfig{CORSOrigins: cfg.CORSOrigins, MaxRequestBody: maxRequestBody})
 	return App{Config: cfg, Auth: authService, Handler: handler, RefreshInterval: refreshInterval}, nil
 }

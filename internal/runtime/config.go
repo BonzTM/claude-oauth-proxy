@@ -36,6 +36,8 @@ const (
 	EnvCCRuntimeVer    = "CLAUDE_OAUTH_PROXY_CC_RUNTIME_VERSION"
 	EnvCCOS            = "CLAUDE_OAUTH_PROXY_CC_OS"
 	EnvCCArch          = "CLAUDE_OAUTH_PROXY_CC_ARCH"
+	EnvCostTracking    = "CLAUDE_OAUTH_PROXY_COST_TRACKING"
+	EnvOpenRouterURL   = "CLAUDE_OAUTH_PROXY_OPENROUTER_URL"
 )
 
 const (
@@ -86,6 +88,8 @@ type Config struct {
 	CCRuntimeVer    string
 	CCOS            string
 	CCArch          string
+	CostTracking    bool
+	OpenRouterURL   string
 }
 
 func DefaultConfig() Config {
@@ -156,6 +160,10 @@ func configFromEnv(getenv func(string) string, tokenFile func() string) Config {
 	apply(getenv(EnvCCRuntimeVer), &cfg.CCRuntimeVer)
 	apply(getenv(EnvCCOS), &cfg.CCOS)
 	apply(getenv(EnvCCArch), &cfg.CCArch)
+	apply(getenv(EnvOpenRouterURL), &cfg.OpenRouterURL)
+	if v := strings.TrimSpace(getenv(EnvCostTracking)); v != "" {
+		cfg.CostTracking = v == "true" || v == "1" || v == "yes"
+	}
 	return cfg
 }
 

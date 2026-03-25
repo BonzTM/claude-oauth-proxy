@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-03-25
+
+### Added
+
+- Theoretical cost tracking via OpenRouter pricing data. Enable with `--cost-tracking` flag or `CLAUDE_OAUTH_PROXY_COST_TRACKING=true` env var.
+- Per-request cost details in response body (`usage.cost` field) with input, output, cache write, cache read, and total cost breakdowns in USD.
+- `X-Request-Cost` response header on non-streaming requests (e.g. `0.010500 USD`).
+- Cost logging via structured log event `cost.tracked` with per-component cost fields.
+- Cache-aware cost calculation: cache writes priced at 1.25x input, cache reads at 0.1x input.
+- OpenRouter pricing source with `anthropic/` prefix fallback for model name resolution.
+- `CLAUDE_OAUTH_PROXY_OPENROUTER_URL` env var for custom OpenRouter endpoint (defaults to `https://openrouter.ai/api/v1/models`).
+
+### Changed
+
+- `X-Request-Cost` added to CORS `Access-Control-Expose-Headers` for browser client visibility.
+
+See [docs/release-notes/RELEASE_NOTES_1.1.2.md](docs/release-notes/RELEASE_NOTES_1.1.2.md) for the full release notes.
+
 ## [1.1.1] - 2026-03-24
 
 ### Added
@@ -78,7 +96,7 @@ Initial public release of claude-oauth-proxy.
 - OpenAI-compatible API proxy for Claude via OAuth (`GET /v1/models`, `POST /v1/chat/completions`)
 - Streaming and non-streaming chat completions
 - Tool use / function calling with OpenAI-to-Anthropic translation
-- Automatic prompt caching with cache breakpoints and `prompt_tokens_details.cached_tokens` in responses
+- Automatic prompt caching with cache breakpoints on user messages and tool definitions
 - OAuth login flow with browser and headless modes
 - Token persistence, background refresh, and automatic 401 retry
 - Claude CLI credential reuse via seed file
@@ -90,7 +108,8 @@ Initial public release of claude-oauth-proxy.
 
 See [docs/release-notes/RELEASE_NOTES_1.0.0.md](docs/release-notes/RELEASE_NOTES_1.0.0.md) for the full release notes.
 
-[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BonzTM/claude-oauth-proxy/releases/tag/v1.0.0

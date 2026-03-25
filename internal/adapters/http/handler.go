@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -111,6 +112,9 @@ func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) 
 		writeError(w, apiErr)
 		return
 	}
+	if c := result.Response.Usage.Cost; c != nil {
+		w.Header().Set("X-Request-Cost", fmt.Sprintf("%.6f %s", c.TotalCost, c.Currency))
+	}
 	writeJSON(w, http.StatusOK, result.Response)
 }
 
@@ -210,7 +214,7 @@ func (h *Handler) withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-Key, X-Request-ID")
-			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
+			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, X-Request-Cost")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 			if r.Method == http.MethodOptions {
 				w.Header().Add("Vary", "Access-Control-Request-Method")
