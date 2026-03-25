@@ -230,7 +230,9 @@ func TestDirectCLIHelpers(t *testing.T) {
 func TestExecuteLoginFlowReturnsOnContextCancel(t *testing.T) {
 	authService := &fakeAuthService{prepareOut: auth.PrepareLoginOutput{AuthURL: "https://claude.ai/oauth/authorize", State: "state", CodeVerifier: "verifier"}}
 	stdinReader, stdinWriter := io.Pipe()
-	defer stdinWriter.Close()
+	defer func() {
+		_ = stdinWriter.Close()
+	}()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	ctx, cancel := context.WithCancel(context.Background())
@@ -240,7 +242,7 @@ func TestExecuteLoginFlowReturnsOnContextCancel(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 	cancel()
-	stdinWriter.Close()
+	_ = stdinWriter.Close()
 	select {
 	case code := <-done:
 		if code != 1 {

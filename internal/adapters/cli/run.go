@@ -45,13 +45,13 @@ func run(ctx context.Context, factory Factory, baseConfig runtime.Config, logger
 	case "config":
 		return runConfig(baseConfig, stdout, stderr, args[1:])
 	case "version", "--version", "-v":
-		fmt.Fprintln(stdout, buildinfo.Banner("claude-oauth-proxy"))
+		_, _ = fmt.Fprintln(stdout, buildinfo.Banner("claude-oauth-proxy"))
 		return 0
 	case "help", "--help", "-h":
 		printUsage(stdout)
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
+		_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
 		printUsage(stderr)
 		return 2
 	}
@@ -74,7 +74,7 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 	baseConfig.CostTracking = *costTracking
 	app, err := factory(baseConfig, logger)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
 		return 1
 	}
 	if *relogin {
@@ -84,7 +84,7 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 	} else {
 		status, apiErr := app.Auth.Status(ctx, auth.StatusInput{})
 		if apiErr != nil {
-			fmt.Fprintf(stderr, "failed to inspect token state: %v\n", apiErr)
+			_, _ = fmt.Fprintf(stderr, "failed to inspect token state: %v\n", apiErr)
 			return 1
 		}
 		if !status.Exists {
@@ -107,9 +107,9 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 	}()
-	fmt.Fprintf(stdout, "serving OpenAI-compatible API on http://127.0.0.1%s\n", baseConfig.ListenAddr)
+	_, _ = fmt.Fprintf(stdout, "serving OpenAI-compatible API on http://127.0.0.1%s\n", baseConfig.ListenAddr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintf(stderr, "server failed: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "server failed: %v\n", err)
 		return 1
 	}
 	return 0
@@ -125,7 +125,7 @@ func runLogin(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 	}
 	app, err := factory(baseConfig, logger)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
 		return 1
 	}
 	return executeLoginFlow(ctx, app.Auth, stdin, stdout, stderr, !*noBrowser, *code)
@@ -134,48 +134,48 @@ func runLogin(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 func runStatus(ctx context.Context, factory Factory, baseConfig runtime.Config, logger logging.Logger, stdout, stderr io.Writer) int {
 	app, err := factory(baseConfig, logger)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
 		return 1
 	}
 	status, apiErr := app.Auth.Status(ctx, auth.StatusInput{})
 	if apiErr != nil {
-		fmt.Fprintf(stderr, "failed to load status: %v\n", apiErr)
+		_, _ = fmt.Fprintf(stderr, "failed to load status: %v\n", apiErr)
 		return 1
 	}
 	if !status.Exists {
-		fmt.Fprintf(stdout, "no saved oauth session at %s\n", status.TokenPath)
+		_, _ = fmt.Fprintf(stdout, "no saved oauth session at %s\n", status.TokenPath)
 		return 0
 	}
-	fmt.Fprintf(stdout, "saved oauth session at %s\n", status.TokenPath)
-	fmt.Fprintf(stdout, "expires at %s\n", status.ExpiresAt.Format(time.RFC3339))
-	fmt.Fprintf(stdout, "expired=%t\n", status.Expired)
+	_, _ = fmt.Fprintf(stdout, "saved oauth session at %s\n", status.TokenPath)
+	_, _ = fmt.Fprintf(stdout, "expires at %s\n", status.ExpiresAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(stdout, "expired=%t\n", status.Expired)
 	return 0
 }
 
 func runLogout(ctx context.Context, factory Factory, baseConfig runtime.Config, logger logging.Logger, stdout, stderr io.Writer) int {
 	app, err := factory(baseConfig, logger)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "failed to initialize app: %v\n", err)
 		return 1
 	}
 	result, apiErr := app.Auth.Logout(ctx, auth.LogoutInput{})
 	if apiErr != nil {
-		fmt.Fprintf(stderr, "failed to delete token file: %v\n", apiErr)
+		_, _ = fmt.Fprintf(stderr, "failed to delete token file: %v\n", apiErr)
 		return 1
 	}
-	fmt.Fprintf(stdout, "deleted oauth session at %s\n", result.TokenPath)
+	_, _ = fmt.Fprintf(stdout, "deleted oauth session at %s\n", result.TokenPath)
 	return 0
 }
 
 func runConfig(baseConfig runtime.Config, stdout, stderr io.Writer, args []string) int {
 	if len(args) == 1 && args[0] == "validate" {
 		if err := baseConfig.Validate(); err != nil {
-			fmt.Fprintf(stderr, "config is invalid: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "config is invalid: %v\n", err)
 			return 1
 		}
-		fmt.Fprintln(stdout, "config is valid")
-		fmt.Fprintf(stdout, "listen_addr=%s\n", baseConfig.ListenAddr)
-		fmt.Fprintf(stdout, "token_file=%s\n", baseConfig.TokenFile)
+		_, _ = fmt.Fprintln(stdout, "config is valid")
+		_, _ = fmt.Fprintf(stdout, "listen_addr=%s\n", baseConfig.ListenAddr)
+		_, _ = fmt.Fprintf(stdout, "token_file=%s\n", baseConfig.TokenFile)
 		return 0
 	}
 	printUsage(stderr)
@@ -185,17 +185,17 @@ func runConfig(baseConfig runtime.Config, stdout, stderr io.Writer, args []strin
 func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Reader, stdout, stderr io.Writer, openBrowser bool, code string) int {
 	prepared, apiErr := authService.PrepareLogin(ctx, auth.PrepareLoginInput{OpenBrowser: openBrowser})
 	if apiErr != nil {
-		fmt.Fprintf(stderr, "failed to prepare oauth login: %v\n", apiErr)
+		_, _ = fmt.Fprintf(stderr, "failed to prepare oauth login: %v\n", apiErr)
 		return 1
 	}
-	fmt.Fprintf(stdout, "open this URL in your browser:\n\n%s\n\n", prepared.AuthURL)
+	_, _ = fmt.Fprintf(stdout, "open this URL in your browser:\n\n%s\n\n", prepared.AuthURL)
 	code = strings.TrimSpace(code)
 	if code == "" {
-		fmt.Fprintln(stdout, "after logging in, copy the ?code=... value from the redirect URL and paste it here:")
-		fmt.Fprint(stdout, "code: ")
+		_, _ = fmt.Fprintln(stdout, "after logging in, copy the ?code=... value from the redirect URL and paste it here:")
+		_, _ = fmt.Fprint(stdout, "code: ")
 		line, err := readLineWithContext(ctx, stdin)
 		if err != nil {
-			fmt.Fprintf(stderr, "failed to read oauth code: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "failed to read oauth code: %v\n", err)
 			return 1
 		}
 		code = strings.TrimSpace(line)
@@ -203,11 +203,11 @@ func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Re
 	code = normalizeCode(code)
 	result, apiErr := authService.CompleteLogin(ctx, auth.CompleteLoginInput{Code: code, State: prepared.State, CodeVerifier: prepared.CodeVerifier})
 	if apiErr != nil {
-		fmt.Fprintf(stderr, "failed to complete oauth login: %v\n", apiErr)
+		_, _ = fmt.Fprintf(stderr, "failed to complete oauth login: %v\n", apiErr)
 		return 1
 	}
-	fmt.Fprintf(stdout, "saved oauth session to %s\n", result.TokenPath)
-	fmt.Fprintf(stdout, "token expires at %s\n", result.ExpiresAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(stdout, "saved oauth session to %s\n", result.TokenPath)
+	_, _ = fmt.Fprintf(stdout, "token expires at %s\n", result.ExpiresAt.Format(time.RFC3339))
 	return 0
 }
 
@@ -279,15 +279,15 @@ func printUsage(w io.Writer) {
 	if w == nil {
 		w = os.Stdout
 	}
-	fmt.Fprintln(w, "claude-oauth-proxy - OpenAI-compatible Claude OAuth proxy")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>] [--cost-tracking]")
-	fmt.Fprintln(w, "  claude-oauth-proxy login [--no-browser] [--code <code>]")
-	fmt.Fprintln(w, "  claude-oauth-proxy status")
-	fmt.Fprintln(w, "  claude-oauth-proxy logout")
-	fmt.Fprintln(w, "  claude-oauth-proxy config validate")
-	fmt.Fprintln(w, "  claude-oauth-proxy version")
+	_, _ = fmt.Fprintln(w, "claude-oauth-proxy - OpenAI-compatible Claude OAuth proxy")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>] [--cost-tracking]")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy login [--no-browser] [--code <code>]")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy status")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy logout")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy config validate")
+	_, _ = fmt.Fprintln(w, "  claude-oauth-proxy version")
 }
 
 func NewDefaultFactory(logger logging.Logger) Factory {
