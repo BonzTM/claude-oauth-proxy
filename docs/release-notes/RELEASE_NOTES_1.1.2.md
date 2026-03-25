@@ -2,7 +2,7 @@
 
 ## Release Summary
 
-Patch release adding theoretical cost tracking. When enabled, the proxy fetches per-model pricing from the OpenRouter API at startup and attaches cost breakdowns to every response — both as structured log entries and in the response body/headers. Cache-aware pricing applies Anthropic's 1.25x write / 0.1x read multipliers.
+Patch release adding theoretical cost tracking. When enabled, the proxy lazily fetches per-model pricing from the OpenRouter API on first cost lookup and attaches cost breakdowns to responses where pricing is available — both as structured log entries and in the response body/headers. Cache-aware pricing applies Anthropic's 1.25x write / 0.1x read multipliers.
 
 ## Added
 
@@ -30,7 +30,7 @@ Patch release adding theoretical cost tracking. When enabled, the proxy fetches 
 - **`X-Request-Cost` response header** — Non-streaming responses include a header (e.g. `X-Request-Cost: 0.008505 USD`) for lightweight cost visibility without parsing the body.
 - **Structured cost logging** — Every request with pricing data emits a `cost.tracked` log event with per-component cost fields. When pricing is unavailable for a model, a `cost.pricing_not_found` event is logged instead.
 - **Cache-aware pricing** — Cost calculation applies Anthropic cache pricing rules: cache creation tokens at 1.25x the input rate, cache read tokens at 0.1x the input rate. Regular input tokens are the remainder after subtracting cache tokens.
-- **OpenRouter pricing source** — Pricing is fetched from `GET https://openrouter.ai/api/v1/models` at startup and cached in memory. Model lookup tries the exact model name first, then falls back to `anthropic/{model}` (the OpenRouter naming convention).
+- **OpenRouter pricing source** — Pricing is fetched from `GET https://openrouter.ai/api/v1/models` on first cost lookup and cached in memory. Model lookup tries the exact model name first, then falls back to `anthropic/{model}` (the OpenRouter naming convention).
 - **`CLAUDE_OAUTH_PROXY_OPENROUTER_URL`** — Optional env var to override the OpenRouter API endpoint. Defaults to `https://openrouter.ai/api/v1/models`.
 
 ## Changed
@@ -71,15 +71,15 @@ None. All changes are backwards-compatible.
 
 ## Known Issues
 
-- Pricing data is fetched once at startup and cached for the lifetime of the process. If OpenRouter pricing changes mid-run, a restart is required to pick up new prices. A periodic refresh could be added in a future release.
-- If the OpenRouter API is unreachable at startup, cost tracking is still enabled but all requests will log `cost.pricing_not_found`. The proxy continues to function normally — cost data is best-effort.
+- Pricing data is fetched once per process (on first lookup) and cached for the lifetime of the process. If OpenRouter pricing changes mid-run, a restart is required to pick up new prices. A periodic refresh could be added in a future release.
+- If the OpenRouter API is unreachable during the first pricing fetch, cost tracking is still enabled but requests will log `cost.pricing_not_found`. The proxy continues to function normally — cost data is best-effort.
 - Reasoning token counts remain estimated (~4 chars/token heuristic). Anthropic does not expose a separate thinking token count, so cost for thinking tokens is folded into the output token cost.
 
 ## Compatibility and Migration
 
 - No configuration changes required for existing deployments.
 - To enable: set `CLAUDE_OAUTH_PROXY_COST_TRACKING=true` or pass `--cost-tracking` to `serve`.
-- Outbound HTTPS access to `openrouter.ai` is required at startup when cost tracking is enabled.
+- Outbound HTTPS access to `openrouter.ai` is required before the first priced request when cost tracking is enabled.
 
 ## Full Changelog
 

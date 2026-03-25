@@ -40,6 +40,7 @@ type OpenRouterSource struct {
 	prices   map[string]ModelPricing
 	url      string
 	client   *http.Client
+	fetchMu  sync.Mutex
 	fetched  bool
 	fetchErr error
 }
@@ -64,21 +65,36 @@ func NewOpenRouterSource(url string, httpClient *http.Client) *OpenRouterSource 
 // Fetch retrieves pricing data from the OpenRouter API and caches it.
 // It should be called once at startup. Returns an error if the fetch fails.
 func (s *OpenRouterSource) Fetch(ctx context.Context) error {
+	prices, err := s.fetchPrices(ctx)
+	s.fetchMu.Lock()
+	defer s.fetchMu.Unlock()
+	s.fetched = true
+	s.fetchErr = err
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.prices = prices
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *OpenRouterSource) fetchPrices(ctx context.Context) (map[string]ModelPricing, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
 	if err != nil {
-		return fmt.Errorf("build openrouter request: %w", err)
+		return nil, fmt.Errorf("build openrouter request: %w", err)
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("fetch openrouter models: %w", err)
+		return nil, fmt.Errorf("fetch openrouter models: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("openrouter returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("openrouter returned status %d", resp.StatusCode)
 	}
 	var result openRouterResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode openrouter response: %w", err)
+		return nil, fmt.Errorf("decode openrouter response: %w", err)
 	}
 	prices := make(map[string]ModelPricing, len(result.Data))
 	for _, m := range result.Data {
@@ -95,17 +111,27 @@ func (s *OpenRouterSource) Fetch(ctx context.Context) error {
 			OutputPerToken: outputPrice,
 		}
 	}
-	s.mu.Lock()
-	s.prices = prices
-	s.fetched = true
-	s.mu.Unlock()
-	return nil
+	return prices, nil
 }
 
 // Lookup finds pricing for a model. It tries the exact model name first,
 // then falls back to "anthropic/<model>" (the OpenRouter convention for
 // Anthropic models).
 func (s *OpenRouterSource) Lookup(model string) (ModelPricing, bool) {
+	s.fetchMu.Lock()
+	if !s.fetched {
+		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		prices, err := s.fetchPrices(ctx)
+		cancel()
+		s.fetched = true
+		s.fetchErr = err
+		if err == nil {
+			s.mu.Lock()
+			s.prices = prices
+			s.mu.Unlock()
+		}
+	}
+	s.fetchMu.Unlock()
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if p, ok := s.prices[model]; ok {

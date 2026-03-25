@@ -1,7 +1,10 @@
 package runtime
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,5 +64,30 @@ func TestNewAppWithLoggerRejectsBadMaxRequestBody(t *testing.T) {
 	cfg.MaxRequestBody = "not-a-size"
 	if _, err := NewAppWithLogger(cfg, logging.NewRecorder()); err == nil {
 		t.Fatal("expected max request body parse error")
+	}
+}
+
+func TestNewAppWithLoggerDoesNotFetchOpenRouterAtStartup(t *testing.T) {
+	var requests int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.TokenFile = filepath.Join(t.TempDir(), "tokens.json")
+	cfg.CostTracking = true
+	cfg.OpenRouterURL = server.URL
+	app, err := NewAppWithLogger(cfg, logging.NewRecorder())
+	if err != nil {
+		t.Fatalf("new app with cost tracking: %v", err)
+	}
+	if app.Auth == nil || app.Handler == nil {
+		t.Fatalf("unexpected app: %+v", app)
+	}
+	if atomic.LoadInt32(&requests) != 0 {
+		t.Fatalf("expected no OpenRouter calls during startup, got %d", atomic.LoadInt32(&requests))
 	}
 }

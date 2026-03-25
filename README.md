@@ -159,6 +159,7 @@ More detail: `docs/deploy/kubernetes.md`
 - stores OAuth tokens in a local file and reuses them across runs
 - refreshes tokens automatically while the proxy is running
 - retries transparently on 401 with a forced token refresh
+- optional theoretical cost tracking via OpenRouter pricing (see `docs/configuration.md`)
 - supports:
   - `GET /v1/models` (unauthenticated — allows client model discovery without credentials)
   - `POST /v1/chat/completions` (streaming and non-streaming, requires API key)
@@ -309,7 +310,7 @@ curl http://127.0.0.1:9999/v1/chat/completions \
 ## CLI Commands
 
 ```bash
-claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>]
+claude-oauth-proxy serve [--listen-addr :9999] [--api-key sk-proxy-local-key] [--relogin] [--no-browser] [--code <code>] [--cost-tracking]
 claude-oauth-proxy login [--no-browser] [--code <code>]
 claude-oauth-proxy status
 claude-oauth-proxy logout

@@ -132,11 +132,23 @@ curl -sf http://127.0.0.1:9999/healthz
 curl -sf http://127.0.0.1:9999/readyz
 ```
 
+## Cost Tracking
+
+To enable theoretical cost tracking, add the environment variable to your Compose file:
+
+```yaml
+environment:
+  CLAUDE_OAUTH_PROXY_COST_TRACKING: "true"
+```
+
+The proxy fetches model pricing from the OpenRouter API on first cost lookup and attaches a cost breakdown to responses where pricing is available. See the [configuration reference](../configuration.md#cost-tracking) for details.
+
 ## Important Notes
 
 - keep the mounted token directory writable so refreshes can be saved
 - do not bake live OAuth tokens into the image
 - treat the mounted runtime directory as sensitive data
+- when cost tracking is enabled, the container needs outbound HTTPS access to `openrouter.ai` before the first priced request
 
 ---
 

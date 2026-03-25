@@ -115,6 +115,7 @@ config:
   extraEnv:
     CLAUDE_OAUTH_PROXY_API_KEY: my-custom-local-key
     CLAUDE_OAUTH_PROXY_TOKEN_FILE: /data/custom/tokens.json
+    CLAUDE_OAUTH_PROXY_COST_TRACKING: "true"
 ```
 
 Equivalent install command:
@@ -123,7 +124,8 @@ Equivalent install command:
 helm upgrade --install claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy \
   --namespace claude-oauth-proxy \
   --set-string config.extraEnv.CLAUDE_OAUTH_PROXY_API_KEY=my-custom-local-key \
-  --set-string config.extraEnv.CLAUDE_OAUTH_PROXY_TOKEN_FILE=/data/custom/tokens.json
+  --set-string config.extraEnv.CLAUDE_OAUTH_PROXY_TOKEN_FILE=/data/custom/tokens.json \
+  --set-string config.extraEnv.CLAUDE_OAUTH_PROXY_COST_TRACKING=true
 ```
 
 When you override `CLAUDE_OAUTH_PROXY_API_KEY` this way, the chart stops emitting the built-in API key env var and does not require the chart-managed API key Secret.

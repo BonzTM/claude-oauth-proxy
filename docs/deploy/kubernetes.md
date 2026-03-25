@@ -96,6 +96,19 @@ helm upgrade --install claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy 
   --set ingress.hosts[0].host=claude-proxy.example.com
 ```
 
+## Cost Tracking
+
+Enable theoretical cost tracking via `config.extraEnv`:
+
+```bash
+helm upgrade --install claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy \
+  --namespace claude-oauth-proxy \
+  --set config.apiKey.existingSecret.name=claude-oauth-proxy \
+  --set-string config.extraEnv.CLAUDE_OAUTH_PROXY_COST_TRACKING=true
+```
+
+The proxy fetches model pricing from the OpenRouter API on first cost lookup and attaches a cost breakdown to responses where pricing is available. The pod needs outbound HTTPS access to `openrouter.ai` before the first priced request. See the [configuration reference](../configuration.md#cost-tracking) for details.
+
 ## Ongoing Operations
 
 - `GET /livez` is the liveness endpoint

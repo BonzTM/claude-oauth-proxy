@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
@@ -110,5 +111,62 @@ func TestOpenRouterDefaultURL(t *testing.T) {
 	src := NewOpenRouterSource("", nil)
 	if src.url != DefaultOpenRouterURL {
 		t.Fatalf("expected default URL, got %s", src.url)
+	}
+}
+
+func TestOpenRouterLookupFetchesLazily(t *testing.T) {
+	var requests int32
+	models := openRouterResponse{Data: []openRouterModel{
+		{ID: "anthropic/claude-sonnet-4-20250514", Pricing: struct {
+			Prompt     string `json:"prompt"`
+			Completion string `json:"completion"`
+		}{Prompt: "0.000003", Completion: "0.000015"}},
+	}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(models)
+	}))
+	defer server.Close()
+
+	src := NewOpenRouterSource(server.URL, server.Client())
+	p, ok := src.Lookup("claude-sonnet-4-20250514")
+	if !ok {
+		t.Fatal("expected lazy lookup to fetch pricing and succeed")
+	}
+	if p.InputPerToken != 0.000003 {
+		t.Fatalf("unexpected input price: %v", p.InputPerToken)
+	}
+	if atomic.LoadInt32(&requests) != 1 {
+		t.Fatalf("expected one fetch request, got %d", atomic.LoadInt32(&requests))
+	}
+
+	_, _ = src.Lookup("claude-sonnet-4-20250514")
+	if atomic.LoadInt32(&requests) != 1 {
+		t.Fatalf("expected no additional fetch after initial lazy fetch, got %d", atomic.LoadInt32(&requests))
+	}
+}
+
+func TestOpenRouterLookupFetchFailureDoesNotRetry(t *testing.T) {
+	var requests int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	src := NewOpenRouterSource(server.URL, server.Client())
+	if _, ok := src.Lookup("claude-sonnet-4-20250514"); ok {
+		t.Fatal("expected lookup to fail when lazy fetch fails")
+	}
+	if atomic.LoadInt32(&requests) != 1 {
+		t.Fatalf("expected one lazy fetch attempt, got %d", atomic.LoadInt32(&requests))
+	}
+
+	if _, ok := src.Lookup("claude-sonnet-4-20250514"); ok {
+		t.Fatal("expected lookup to continue failing without prices")
+	}
+	if atomic.LoadInt32(&requests) != 1 {
+		t.Fatalf("expected no retry after first lazy fetch failure, got %d", atomic.LoadInt32(&requests))
 	}
 }

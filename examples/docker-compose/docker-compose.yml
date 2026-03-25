@@ -13,6 +13,8 @@ services:
       # To reuse Claude CLI credentials, uncomment the next line and the
       # volume mount below:
       # CLAUDE_OAUTH_PROXY_SEED_FILE: /config/credentials.json
+      # To enable theoretical cost tracking via OpenRouter pricing:
+      # CLAUDE_OAUTH_PROXY_COST_TRACKING: "true"
     volumes:
       - ./runtime:/config
       # To reuse Claude CLI credentials (read-only seed + persistent refresh volume):

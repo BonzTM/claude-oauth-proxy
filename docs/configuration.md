@@ -38,6 +38,8 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_CC_RUNTIME_VERSION` | `v25.8.1` | Node.js version for X-Stainless-Runtime-Version header |
 | `CLAUDE_OAUTH_PROXY_CC_OS` | `Linux` | OS identifier for X-Stainless-OS header |
 | `CLAUDE_OAUTH_PROXY_CC_ARCH` | `x64` | Architecture for X-Stainless-Arch header |
+| `CLAUDE_OAUTH_PROXY_COST_TRACKING` | unset (disabled) | Enable theoretical cost tracking. Set to `true`, `1`, or `yes` to enable |
+| `CLAUDE_OAUTH_PROXY_OPENROUTER_URL` | `https://openrouter.ai/api/v1/models` | OpenRouter API endpoint for fetching model pricing |
 
 Use `scripts/extract-cc-fingerprint.sh` to derive current values from your installed Claude Code. See `docs/maintainers/FINGERPRINT.md` for details on each value.
 
@@ -51,7 +53,8 @@ claude-oauth-proxy serve \
   --api-key sk-proxy-local-key \
   --relogin \
   --no-browser \
-  --code abc123
+  --code abc123 \
+  --cost-tracking
 ```
 
 - `--listen-addr`: override the HTTP bind address
@@ -59,6 +62,7 @@ claude-oauth-proxy serve \
 - `--relogin`: force a new browser OAuth flow even if tokens already exist
 - `--no-browser`: print the auth URL instead of launching a browser
 - `--code`: skip the paste prompt and provide the OAuth code directly
+- `--cost-tracking`: enable theoretical cost tracking via OpenRouter pricing (see [Cost Tracking](#cost-tracking) below)
 
 ### `login`
 
@@ -191,6 +195,60 @@ The proxy keeps tokens fresh through two mechanisms:
 **Background refresh**: a goroutine ticks every `CLAUDE_OAUTH_PROXY_REFRESH_INTERVAL` (default 1 minute) and calls `AccessToken`. If the token is within `CLAUDE_OAUTH_PROXY_REFRESH_SKEW` (default 5 minutes) of expiry, a refresh is triggered. This means tokens are typically refreshed 5 minutes before they expire.
 
 **401 retry**: if an upstream Anthropic request returns HTTP 401, the proxy immediately retries with a forced token refresh. This handles edge cases where a token expires between the background check and the actual request. Clients see a slightly slower response but never an auth error under normal conditions.
+
+## Cost Tracking
+
+When cost tracking is enabled, the proxy fetches per-model pricing from the OpenRouter API on first cost lookup and attaches a cost breakdown to responses where pricing is available. This is "theoretical" cost — it shows what the request would cost at OpenRouter's listed prices.
+
+Enable with a flag:
+
+```bash
+claude-oauth-proxy serve --cost-tracking
+```
+
+Or via environment variable:
+
+```bash
+export CLAUDE_OAUTH_PROXY_COST_TRACKING=true
+claude-oauth-proxy serve
+```
+
+When enabled, the proxy:
+
+1. Fetches model pricing from `https://openrouter.ai/api/v1/models` (or `CLAUDE_OAUTH_PROXY_OPENROUTER_URL`) on first cost lookup and caches it in memory.
+2. After each request, computes cost from the response's token usage and the cached pricing.
+3. Adds a `cost` field to the `usage` object in both streaming and non-streaming responses.
+4. Sets an `X-Request-Cost` header on non-streaming responses (e.g. `0.008505 USD`).
+5. Emits a `cost.tracked` structured log event per request.
+
+Example response `usage` block with cost tracking enabled:
+
+```json
+{
+  "usage": {
+    "prompt_tokens": 1500,
+    "completion_tokens": 200,
+    "total_tokens": 1700,
+    "cost": {
+      "input_cost": 0.003600,
+      "output_cost": 0.003000,
+      "cache_write_cost": 0.001875,
+      "cache_read_cost": 0.000030,
+      "total_cost": 0.008505,
+      "currency": "USD",
+      "model": "claude-sonnet-4-20250514",
+      "input_price_per_1m": 3.0,
+      "output_price_per_1m": 15.0
+    }
+  }
+}
+```
+
+Cache-aware pricing applies Anthropic's multipliers: cache writes at 1.25x the input rate, cache reads at 0.1x the input rate.
+
+If the proxy cannot reach OpenRouter during the first pricing fetch, cost tracking stays active but requests log `cost.pricing_not_found` instead. The proxy continues to function normally — cost data is best-effort.
+
+Pricing data is fetched once per process (on first lookup) and cached for the process lifetime. Restart the proxy to pick up pricing changes.
 
 ---
 

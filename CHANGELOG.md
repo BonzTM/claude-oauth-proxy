@@ -21,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - `X-Request-Cost` added to CORS `Access-Control-Expose-Headers` for browser client visibility.
+- OpenRouter pricing fetch is now lazy (on first cost lookup) instead of app startup, preventing `login`/`status`/`logout` from depending on OpenRouter network reachability when cost tracking is enabled.
+
+### Fixed
+
+- Resolved a cost-tracking regression where non-serving CLI commands (`login`, `status`, `logout`) could block on OpenRouter pricing fetch during app initialization.
 
 See [docs/release-notes/RELEASE_NOTES_1.1.2.md](docs/release-notes/RELEASE_NOTES_1.1.2.md) for the full release notes.
 

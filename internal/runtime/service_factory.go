@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -51,14 +50,6 @@ func NewAppWithLogger(cfg Config, logger logging.Logger) (App, error) {
 	var providerService provider.Service = provider.WithLogging(antprovider.New(antprovider.Config{BaseURL: cfg.AnthropicBase, BetaHeader: cfg.AnthropicBeta, BillingHeader: cfg.BillingHeader, CCVersion: cfg.CCVersion, UserAgent: cfg.CCUserAgent, SDKVersion: cfg.CCSDKVersion, RuntimeVersion: cfg.CCRuntimeVer, StainlessOS: cfg.CCOS, StainlessArch: cfg.CCArch, RequestTimeout: requestTimeout, HTTPClient: &http.Client{}, Now: time.Now}, authService), logger)
 	if cfg.CostTracking {
 		pricing := cost.NewOpenRouterSource(cfg.OpenRouterURL, nil)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		if err := pricing.Fetch(ctx); err != nil {
-			cancel()
-			logger.Error(context.Background(), "cost.openrouter_fetch_failed", "error", err.Error())
-		} else {
-			cancel()
-			logger.Info(context.Background(), "cost.openrouter_loaded", "models", pricing.ModelCount())
-		}
 		providerService = cost.WithCostTracking(providerService, pricing, logger)
 	}
 	handler := httpadapter.NewHandler(providerService, authService, cfg.APIKey, logger, time.Now, httpadapter.HandlerConfig{CORSOrigins: cfg.CORSOrigins, MaxRequestBody: maxRequestBody})
