@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-03-25
+
+### Fixed
+
+- Release-blocking `errcheck` failures in CLI output paths are now handled explicitly across command, usage, status, and login flows.
+- Existing `Close()` cleanup paths in the HTTP adapter, OAuth token exchange flow, and OpenRouter pricing fetch now handle ignored return values explicitly, resolving CI lint failures without changing runtime behavior.
+- Anthropic provider tests now make body/stream cleanup explicit so static analysis passes consistently.
+
+### Changed
+
+- `internal/runtime/service_factory.go` now relies on inferred local typing for `providerService`, resolving a `staticcheck` warning without changing runtime behavior.
+
+See [docs/release-notes/RELEASE_NOTES_1.1.3.md](docs/release-notes/RELEASE_NOTES_1.1.3.md) for the full release notes.
+
 ## [1.1.2] - 2026-03-25
 
 ### Added
@@ -113,7 +127,8 @@ Initial public release of claude-oauth-proxy.
 
 See [docs/release-notes/RELEASE_NOTES_1.0.0.md](docs/release-notes/RELEASE_NOTES_1.0.0.md) for the full release notes.
 
-[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.3...HEAD
+[1.1.3]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.0.0...v1.1.0
