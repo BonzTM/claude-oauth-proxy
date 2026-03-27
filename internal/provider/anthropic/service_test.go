@@ -720,7 +720,7 @@ func TestCreateChatCompletionStreamIgnoresRequestTimeout(t *testing.T) {
 	if apiErr != nil {
 		t.Fatalf("unexpected stream creation error: %v", apiErr)
 	}
-	defer result.Stream.Close()
+	defer func() { _ = result.Stream.Close() }()
 	if _, err := result.Stream.Next(); err != nil {
 		t.Fatalf("unexpected first chunk error: %v", err)
 	}
