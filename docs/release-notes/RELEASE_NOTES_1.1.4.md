@@ -2,7 +2,7 @@
 
 ## Release Summary
 
-Fingerprint maintenance release. Updates the Claude Code client version defaults from `2.1.84` to `2.1.85` so that proxy requests match the latest Claude Code CLI release. No functional changes, new features, or configuration schema changes are included.
+Fingerprint maintenance and CI infrastructure release. Updates the Claude Code client version defaults from `2.1.84` to `2.1.85` so that proxy requests match the latest Claude Code CLI release, upgrades 9 GitHub Actions dependencies from Node 20 to Node 24 runtime, and fixes an `errcheck` lint failure in the Anthropic provider test suite. No functional changes, new features, or configuration schema changes are included.
 
 ## Changed
 
@@ -10,10 +10,23 @@ Fingerprint maintenance release. Updates the Claude Code client version defaults
 - **User-Agent default** — `DefaultUserAgent` updated from `claude-cli/2.1.84 (external, cli)` to `claude-cli/2.1.85 (external, cli)`.
 - **Documentation** — Configuration reference (`docs/configuration.md`) and fingerprint maintenance guide (`docs/maintainers/FINGERPRINT.md`) updated to reflect the new version.
 - **Extraction script** — Comment example in `scripts/extract-cc-fingerprint.sh` updated to `2.1.85`.
+- **GitHub Actions Node 24 migration** — Upgraded 9 action dependencies across all 4 CI/CD workflows to Node 24 runtime versions, eliminating Node 20 deprecation warnings:
+
+  | Action | Old | New |
+  |---|---|---|
+  | `actions/checkout` | `@v4` | `@v6` |
+  | `actions/setup-go` | `@v5` | `@v6` |
+  | `actions/upload-artifact` | `@v4` | `@v7` |
+  | `golangci/golangci-lint-action` | `@v8` | `@v9` |
+  | `azure/setup-helm` | `@v4` | `@v5` |
+  | `docker/setup-qemu-action` | `@v3` | `@v4` |
+  | `docker/setup-buildx-action` | `@v3` | `@v4` |
+  | `docker/login-action` | `@v3` | `@v4` |
+  | `docker/build-push-action` | `@v6` | `@v7` |
 
 ## Fixed
 
-- None.
+- **Anthropic provider test lint** — `result.Stream.Close()` return value in `service_test.go` is now explicitly discarded (`_ = ...`), resolving an `errcheck` failure.
 
 ## Added
 
@@ -50,7 +63,8 @@ None. All changes are default-value updates and fully backwards-compatible.
 
 ## Known Issues
 
-- Known issues from 1.1.3 remain unchanged; this patch does not add new user-facing behavior.
+- `softprops/action-gh-release@v2` and `peaceiris/actions-gh-pages@v4` remain on Node 20 as no upstream Node 24 release is available yet. These will be updated when new major versions are published.
+- Other known issues from 1.1.3 remain unchanged; this patch does not add new user-facing behavior.
 
 ## Compatibility and Migration
 

@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Updated Claude Code client fingerprint defaults from `2.1.84` to `2.1.85` across proxy defaults, documentation, and extraction script.
+- Upgraded 9 GitHub Actions dependencies to Node 24 runtime versions across all CI/CD workflows: `actions/checkout` v4→v6, `actions/setup-go` v5→v6, `actions/upload-artifact` v4→v7, `golangci/golangci-lint-action` v8→v9, `azure/setup-helm` v4→v5, `docker/setup-qemu-action` v3→v4, `docker/setup-buildx-action` v3→v4, `docker/login-action` v3→v4, `docker/build-push-action` v6→v7.
+
+### Fixed
+
+- Resolved `errcheck` lint failure on `result.Stream.Close()` in Anthropic provider streaming test.
+
+### Known Remaining Node 20 Actions
+
+- `softprops/action-gh-release@v2` and `peaceiris/actions-gh-pages@v4` have no Node 24 release yet. These will be updated when upstream releases are available.
 
 See [docs/release-notes/RELEASE_NOTES_1.1.4.md](docs/release-notes/RELEASE_NOTES_1.1.4.md) for the full release notes.
 
