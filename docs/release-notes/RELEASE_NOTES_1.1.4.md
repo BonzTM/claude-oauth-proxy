@@ -2,14 +2,14 @@
 
 ## Release Summary
 
-Fingerprint maintenance and CI infrastructure release. Updates the Claude Code client version defaults from `2.1.84` to `2.1.85` so that proxy requests match the latest Claude Code CLI release, upgrades 9 GitHub Actions dependencies from Node 20 to Node 24 runtime, and fixes an `errcheck` lint failure in the Anthropic provider test suite. No functional changes, new features, or configuration schema changes are included.
+Fingerprint maintenance and CI infrastructure release. Updates the Claude Code client version defaults from `2.1.84` to `2.1.87` so that proxy requests match the latest Claude Code CLI release, upgrades 9 GitHub Actions dependencies from Node 20 to Node 24 runtime, and fixes an `errcheck` lint failure in the Anthropic provider test suite. No functional changes, new features, or configuration schema changes are included.
 
 ## Changed
 
-- **Claude Code version bump** — `DefaultCCVersion` updated from `2.1.84` to `2.1.85` in `internal/runtime/config.go`.
-- **User-Agent default** — `DefaultUserAgent` updated from `claude-cli/2.1.84 (external, cli)` to `claude-cli/2.1.85 (external, cli)`.
+- **Claude Code version bump** — `DefaultCCVersion` updated from `2.1.84` to `2.1.87` in `internal/runtime/config.go`.
+- **User-Agent default** — `DefaultUserAgent` updated from `claude-cli/2.1.84 (external, cli)` to `claude-cli/2.1.87 (external, cli)`.
 - **Documentation** — Configuration reference (`docs/configuration.md`) and fingerprint maintenance guide (`docs/maintainers/FINGERPRINT.md`) updated to reflect the new version.
-- **Extraction script** — Comment example in `scripts/extract-cc-fingerprint.sh` updated to `2.1.85`.
+- **Extraction script** — Comment example in `scripts/extract-cc-fingerprint.sh` updated to `2.1.87`.
 - **GitHub Actions Node 24 migration** — Upgraded 9 action dependencies across all 4 CI/CD workflows to Node 24 runtime versions, eliminating Node 20 deprecation warnings:
 
   | Action | Old | New |
@@ -53,8 +53,8 @@ helm upgrade --install claude-oauth-proxy claude-oauth-proxy/claude-oauth-proxy 
 Alternatively, set the new version via environment variables on an existing binary without rebuilding:
 
 ```bash
-export CLAUDE_OAUTH_PROXY_CC_VERSION=2.1.85
-export CLAUDE_OAUTH_PROXY_CC_USER_AGENT="claude-cli/2.1.85 (external, cli)"
+export CLAUDE_OAUTH_PROXY_CC_VERSION=2.1.87
+export CLAUDE_OAUTH_PROXY_CC_USER_AGENT="claude-cli/2.1.87 (external, cli)"
 ```
 
 ## Breaking Changes

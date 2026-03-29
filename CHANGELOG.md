@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Updated Claude Code client fingerprint defaults from `2.1.84` to `2.1.85` across proxy defaults, documentation, and extraction script.
+- Updated Claude Code client fingerprint defaults from `2.1.84` to `2.1.87` across proxy defaults, documentation, and extraction script.
 - Upgraded 9 GitHub Actions dependencies to Node 24 runtime versions across all CI/CD workflows: `actions/checkout` v4→v6, `actions/setup-go` v5→v6, `actions/upload-artifact` v4→v7, `golangci/golangci-lint-action` v8→v9, `azure/setup-helm` v4→v5, `docker/setup-qemu-action` v3→v4, `docker/setup-buildx-action` v3→v4, `docker/login-action` v3→v4, `docker/build-push-action` v6→v7.
 
 ### Fixed
