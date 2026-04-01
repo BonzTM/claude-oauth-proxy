@@ -14,7 +14,7 @@
 #   CC_VERSION
 #     The bundled VERSION constant in cli.js. Found via:
 #       grep -oP 'VERSION:"[^"]+"' cli.js | head -1
-#     This is the Claude Code product version (e.g. 2.1.87).
+#     This is the Claude Code product version (e.g. 2.1.89).
 #
 #   CC_USER_AGENT
 #     Built by pE() in cli.js as: claude-cli/${VERSION} (external, cli)

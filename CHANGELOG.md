@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-04-01
+
+### Changed
+
+- Updated Claude Code client fingerprint defaults from `2.1.87` to `2.1.89` across proxy defaults, documentation, and extraction script.
+
+See [docs/release-notes/RELEASE_NOTES_1.1.5.md](docs/release-notes/RELEASE_NOTES_1.1.5.md) for the full release notes.
+
 ## [1.1.4] - 2026-03-27
 
 ### Changed
