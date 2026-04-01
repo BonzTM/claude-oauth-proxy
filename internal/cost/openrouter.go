@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -116,9 +117,24 @@ func (s *OpenRouterSource) fetchPrices(ctx context.Context) (map[string]ModelPri
 	return prices, nil
 }
 
+// versionHyphenRe matches a digit-hyphen-digit sequence that represents a
+// version separator (e.g. the "4-6" in "claude-opus-4-6"). OpenRouter uses
+// dots for these (claude-opus-4.6) while the Anthropic API uses hyphens
+// (claude-opus-4-6). We replace all such occurrences so that names like
+// "claude-3-5-sonnet" also normalise to "claude-3.5-sonnet".
+var versionHyphenRe = regexp.MustCompile(`(\d)-(\d)`)
+
+// normalizeModelVersion converts digit-hyphen-digit sequences to
+// digit-dot-digit so that Anthropic-style model names (claude-opus-4-6)
+// match OpenRouter-style names (claude-opus-4.6).
+func normalizeModelVersion(model string) string {
+	return versionHyphenRe.ReplaceAllString(model, "${1}.${2}")
+}
+
 // Lookup finds pricing for a model. It tries the exact model name first,
 // then falls back to "anthropic/<model>" (the OpenRouter convention for
-// Anthropic models).
+// Anthropic models). If still not found, it normalises version separators
+// from hyphens to dots and retries both lookups.
 func (s *OpenRouterSource) Lookup(model string) (ModelPricing, bool) {
 	s.fetchMu.Lock()
 	if !s.fetched {
@@ -141,6 +157,15 @@ func (s *OpenRouterSource) Lookup(model string) (ModelPricing, bool) {
 	}
 	if p, ok := s.prices["anthropic/"+model]; ok {
 		return p, true
+	}
+	normalized := normalizeModelVersion(model)
+	if normalized != model {
+		if p, ok := s.prices[normalized]; ok {
+			return p, true
+		}
+		if p, ok := s.prices["anthropic/"+normalized]; ok {
+			return p, true
+		}
 	}
 	return ModelPricing{}, false
 }

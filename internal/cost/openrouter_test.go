@@ -107,6 +107,86 @@ func TestOpenRouterSkipsZeroPricingAndInvalidNumbers(t *testing.T) {
 	}
 }
 
+func TestNormalizeModelVersion(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"claude-opus-4-6", "claude-opus-4.6"},
+		{"claude-sonnet-4-6", "claude-sonnet-4.6"},
+		{"claude-3-5-sonnet", "claude-3.5-sonnet"},
+		{"claude-3-7-sonnet", "claude-3.7-sonnet"},
+		{"claude-sonnet-4", "claude-sonnet-4"},
+		{"claude-opus-4-20250514", "claude-opus-4.20250514"},
+		{"no-digits-here", "no-digits-here"},
+		{"already-4.6", "already-4.6"},
+	}
+	for _, tt := range tests {
+		if got := normalizeModelVersion(tt.input); got != tt.want {
+			t.Errorf("normalizeModelVersion(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestOpenRouterLookupVersionNormalization(t *testing.T) {
+	models := openRouterResponse{Data: []openRouterModel{
+		{ID: "anthropic/claude-opus-4.6", Pricing: struct {
+			Prompt     string `json:"prompt"`
+			Completion string `json:"completion"`
+		}{Prompt: "0.000005", Completion: "0.000025"}},
+		{ID: "anthropic/claude-sonnet-4.6", Pricing: struct {
+			Prompt     string `json:"prompt"`
+			Completion string `json:"completion"`
+		}{Prompt: "0.000003", Completion: "0.000015"}},
+		{ID: "anthropic/claude-3.5-sonnet", Pricing: struct {
+			Prompt     string `json:"prompt"`
+			Completion string `json:"completion"`
+		}{Prompt: "0.000006", Completion: "0.000030"}},
+	}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(models)
+	}))
+	defer server.Close()
+
+	src := NewOpenRouterSource(server.URL, server.Client())
+	if err := src.Fetch(context.Background()); err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+
+	p, ok := src.Lookup("claude-opus-4-6")
+	if !ok {
+		t.Fatal("expected version-normalized lookup for claude-opus-4-6 to succeed")
+	}
+	if p.InputPerToken != 0.000005 {
+		t.Fatalf("unexpected input price: %v", p.InputPerToken)
+	}
+
+	p, ok = src.Lookup("claude-sonnet-4-6")
+	if !ok {
+		t.Fatal("expected version-normalized lookup for claude-sonnet-4-6 to succeed")
+	}
+	if p.OutputPerToken != 0.000015 {
+		t.Fatalf("unexpected output price: %v", p.OutputPerToken)
+	}
+
+	p, ok = src.Lookup("claude-3-5-sonnet")
+	if !ok {
+		t.Fatal("expected version-normalized lookup for claude-3-5-sonnet to succeed")
+	}
+	if p.InputPerToken != 0.000006 {
+		t.Fatalf("unexpected input price: %v", p.InputPerToken)
+	}
+
+	p, ok = src.Lookup("anthropic/claude-opus-4.6")
+	if !ok {
+		t.Fatal("expected exact match for anthropic/claude-opus-4.6 to still work")
+	}
+	if p.InputPerToken != 0.000005 {
+		t.Fatalf("unexpected input price: %v", p.InputPerToken)
+	}
+}
+
 func TestOpenRouterDefaultURL(t *testing.T) {
 	src := NewOpenRouterSource("", nil)
 	if src.url != DefaultOpenRouterURL {
