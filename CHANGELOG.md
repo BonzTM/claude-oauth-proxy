@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-04-02
+
+### Changed
+
+- Updated Claude Code client fingerprint defaults from `2.1.89` to `2.1.90` across proxy defaults, documentation, and extraction script.
+
+### Fixed
+
+- Cost tracking now normalizes Anthropic-style model version separators (hyphens) to OpenRouter-style (dots) during price lookup, so models like `claude-opus-4-6` correctly match `anthropic/claude-opus-4.6` pricing data.
+
+See [docs/release-notes/RELEASE_NOTES_1.1.6.md](docs/release-notes/RELEASE_NOTES_1.1.6.md) for the full release notes.
+
 ## [1.1.5] - 2026-04-01
 
 ### Changed
@@ -152,7 +164,9 @@ Initial public release of claude-oauth-proxy.
 
 See [docs/release-notes/RELEASE_NOTES_1.0.0.md](docs/release-notes/RELEASE_NOTES_1.0.0.md) for the full release notes.
 
-[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.4...HEAD
+[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.6...HEAD
+[1.1.6]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.5...1.1.6
+[1.1.5]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.4...1.1.5
 [1.1.4]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/BonzTM/claude-oauth-proxy/compare/v1.1.1...v1.1.2
