@@ -38,6 +38,7 @@ const (
 	EnvCCArch          = "CLAUDE_OAUTH_PROXY_CC_ARCH"
 	EnvCostTracking    = "CLAUDE_OAUTH_PROXY_COST_TRACKING"
 	EnvOpenRouterURL   = "CLAUDE_OAUTH_PROXY_OPENROUTER_URL"
+	EnvNoAutoLogin     = "CLAUDE_OAUTH_PROXY_NO_AUTO_LOGIN"
 )
 
 const (
@@ -90,6 +91,7 @@ type Config struct {
 	CCArch          string
 	CostTracking    bool
 	OpenRouterURL   string
+	NoAutoLogin     bool
 }
 
 func DefaultConfig() Config {
@@ -163,6 +165,9 @@ func configFromEnv(getenv func(string) string, tokenFile func() string) Config {
 	apply(getenv(EnvOpenRouterURL), &cfg.OpenRouterURL)
 	if v := strings.TrimSpace(getenv(EnvCostTracking)); v != "" {
 		cfg.CostTracking = v == "true" || v == "1" || v == "yes"
+	}
+	if v := strings.TrimSpace(getenv(EnvNoAutoLogin)); v != "" {
+		cfg.NoAutoLogin = v == "true" || v == "1" || v == "yes"
 	}
 	return cfg
 }

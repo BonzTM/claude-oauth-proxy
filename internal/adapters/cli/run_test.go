@@ -256,21 +256,13 @@ func TestExecuteLoginFlowReturnsOnContextCancel(t *testing.T) {
 	}
 }
 
-func TestIsInteractive(t *testing.T) {
-	if isInteractive(strings.NewReader("")) {
-		t.Fatal("strings.NewReader should not be interactive")
-	}
-	if isInteractive(bytes.NewReader(nil)) {
-		t.Fatal("bytes.NewReader should not be interactive")
-	}
-}
-
-func TestServeStartsWithoutTokensNonInteractive(t *testing.T) {
+func TestServeNoAutoLoginSkipsLoginFlow(t *testing.T) {
 	authService := &fakeAuthService{
 		statusOut: auth.StatusOutput{TokenPath: "/tmp/tokens.json", Exists: false},
 	}
 	cfg := runtime.DefaultConfig()
 	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.NoAutoLogin = true
 	factory := func(cfg runtime.Config, logger logging.Logger) (runtime.App, error) {
 		return runtime.App{Config: cfg, Auth: authService, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}), RefreshInterval: time.Minute}, nil
 	}
@@ -282,12 +274,12 @@ func TestServeStartsWithoutTokensNonInteractive(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runServe(ctx, factory, cfg, logging.NewRecorder(), strings.NewReader(""), &stdout, &stderr, nil)
 	if code != 0 {
-		t.Fatalf("expected serve to start without tokens in non-interactive mode, got exit code %d stderr=%q", code, stderr.String())
+		t.Fatalf("expected serve to start without tokens when NoAutoLogin=true, got exit code %d stderr=%q", code, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "no valid oauth session found") {
 		t.Fatalf("expected warning about missing session, got stderr=%q", stderr.String())
 	}
 	if authService.prepareHits != 0 {
-		t.Fatalf("expected no login flow in non-interactive mode, got prepareHits=%d", authService.prepareHits)
+		t.Fatalf("expected no login flow when NoAutoLogin=true, got prepareHits=%d", authService.prepareHits)
 	}
 }

@@ -94,13 +94,13 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 			}
 		}
 		if needsLogin {
-			if isInteractive(stdin) {
+			if baseConfig.NoAutoLogin {
+				_, _ = fmt.Fprintln(stderr, "no valid oauth session found; starting server without authentication")
+				_, _ = fmt.Fprintln(stderr, "run 'claude-oauth-proxy login' to authenticate (readiness probe will report not ready until then)")
+			} else {
 				if loginCode := executeLoginFlow(ctx, app.Auth, stdin, stdout, stderr, !*noBrowser, *code); loginCode != 0 {
 					return loginCode
 				}
-			} else {
-				_, _ = fmt.Fprintln(stderr, "no valid oauth session found; starting server without authentication")
-				_, _ = fmt.Fprintln(stderr, "run 'claude-oauth-proxy login' to authenticate (readiness probe will report not ready until then)")
 			}
 		}
 	}
@@ -216,18 +216,6 @@ func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Re
 	_, _ = fmt.Fprintf(stdout, "saved oauth session to %s\n", result.TokenPath)
 	_, _ = fmt.Fprintf(stdout, "token expires at %s\n", result.ExpiresAt.Format(time.RFC3339))
 	return 0
-}
-
-func isInteractive(r io.Reader) bool {
-	f, ok := r.(*os.File)
-	if !ok {
-		return false
-	}
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 func readLineWithContext(ctx context.Context, stdin io.Reader) (string, error) {

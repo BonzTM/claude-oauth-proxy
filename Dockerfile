@@ -26,7 +26,8 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 ENV HOME=/home/nonroot \
     CLAUDE_OAUTH_PROXY_LISTEN_ADDR=:9999 \
-    CLAUDE_OAUTH_PROXY_TOKEN_FILE=/var/lib/claude-oauth-proxy/tokens.json
+    CLAUDE_OAUTH_PROXY_TOKEN_FILE=/var/lib/claude-oauth-proxy/tokens.json \
+    CLAUDE_OAUTH_PROXY_NO_AUTO_LOGIN=true
 
 WORKDIR /home/nonroot
 
