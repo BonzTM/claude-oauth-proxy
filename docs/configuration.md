@@ -40,6 +40,7 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_CC_ARCH` | `x64` | Architecture for X-Stainless-Arch header |
 | `CLAUDE_OAUTH_PROXY_COST_TRACKING` | unset (disabled) | Enable theoretical cost tracking. Set to `true`, `1`, or `yes` to enable |
 | `CLAUDE_OAUTH_PROXY_OPENROUTER_URL` | `https://openrouter.ai/api/v1/models` | OpenRouter API endpoint for fetching model pricing |
+| `CLAUDE_OAUTH_PROXY_NO_AUTO_LOGIN` | unset (disabled); `true` in container image | Skip the interactive login prompt on `serve` startup. The server starts in an unauthenticated state and the readiness probe reports not ready until `login` is run separately |
 
 Use `scripts/extract-cc-fingerprint.sh` to derive current values from your installed Claude Code. See `docs/maintainers/FINGERPRINT.md` for details on each value.
 
