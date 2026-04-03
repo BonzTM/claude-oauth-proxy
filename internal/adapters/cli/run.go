@@ -87,13 +87,20 @@ func runServe(ctx context.Context, factory Factory, baseConfig runtime.Config, l
 			_, _ = fmt.Fprintf(stderr, "failed to inspect token state: %v\n", apiErr)
 			return 1
 		}
-		if !status.Exists {
-			if loginCode := executeLoginFlow(ctx, app.Auth, stdin, stdout, stderr, !*noBrowser, *code); loginCode != 0 {
-				return loginCode
+		needsLogin := !status.Exists
+		if !needsLogin {
+			if _, apiErr := app.Auth.AccessToken(ctx, auth.AccessTokenInput{}); apiErr != nil {
+				needsLogin = true
 			}
-		} else if _, apiErr := app.Auth.AccessToken(ctx, auth.AccessTokenInput{}); apiErr != nil {
-			if loginCode := executeLoginFlow(ctx, app.Auth, stdin, stdout, stderr, !*noBrowser, *code); loginCode != 0 {
-				return loginCode
+		}
+		if needsLogin {
+			if isInteractive(stdin) {
+				if loginCode := executeLoginFlow(ctx, app.Auth, stdin, stdout, stderr, !*noBrowser, *code); loginCode != 0 {
+					return loginCode
+				}
+			} else {
+				_, _ = fmt.Fprintln(stderr, "no valid oauth session found; starting server without authentication")
+				_, _ = fmt.Fprintln(stderr, "run 'claude-oauth-proxy login' to authenticate (readiness probe will report not ready until then)")
 			}
 		}
 	}
@@ -209,6 +216,18 @@ func executeLoginFlow(ctx context.Context, authService auth.Service, stdin io.Re
 	_, _ = fmt.Fprintf(stdout, "saved oauth session to %s\n", result.TokenPath)
 	_, _ = fmt.Fprintf(stdout, "token expires at %s\n", result.ExpiresAt.Format(time.RFC3339))
 	return 0
+}
+
+func isInteractive(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 func readLineWithContext(ctx context.Context, stdin io.Reader) (string, error) {
