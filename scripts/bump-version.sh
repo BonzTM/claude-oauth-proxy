@@ -7,7 +7,7 @@
 #   ./scripts/bump-cc-version.sh <proxy-version> --cc-version <new-cc-version>
 #
 # Examples:
-#   ./scripts/bump-cc-version.sh 1.1.8 --cc-version 2.1.92
+#   ./scripts/bump-cc-version.sh 1.1.8 --cc-version 2.1.107
 #
 # The --cc-version flag is required and sets the Claude Code client version
 # embedded in proxy defaults, documentation, and release notes.

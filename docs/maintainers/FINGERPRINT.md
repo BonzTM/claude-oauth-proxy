@@ -18,16 +18,16 @@ The script outputs environment variable export lines. Either:
 
 ### `CC_VERSION` (env: `CLAUDE_OAUTH_PROXY_CC_VERSION`)
 
-**What it is:** The Claude Code product version (e.g. `2.1.91`).
+**What it is:** The Claude Code product version (e.g. `2.1.107`).
 
 **Where it's used:**
-- Billing header: `cc_version=2.1.91.{turn}`
-- User-Agent: `claude-cli/2.1.91 (external, cli)`
+- Billing header: `cc_version=2.1.107.{turn}`
+- User-Agent: `claude-cli/2.1.107 (external, cli)`
 
 **How to find it:**
 ```bash
 claude --version
-# Output: 2.1.91 (Claude Code)
+# Output: 2.1.107 (Claude Code)
 ```
 
 ### `CC_USER_AGENT` (env: `CLAUDE_OAUTH_PROXY_CC_USER_AGENT`)
@@ -92,7 +92,7 @@ node --version
 The billing header is injected as the first system block on every request:
 
 ```
-x-anthropic-billing-header: cc_version=2.1.91.{turn}; cc_entrypoint=cli; cch=00000;
+x-anthropic-billing-header: cc_version=2.1.107.{turn}; cc_entrypoint=cli; cch=00000;
 ```
 
 - `cc_version`: `{CC_VERSION}.{turn_number}` — Claude Code appends a per-call suffix

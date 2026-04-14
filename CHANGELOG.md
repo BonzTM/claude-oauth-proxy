@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-04-14
+
+### Changed
+
+- Updated Claude Code client fingerprint defaults from `2.1.91` to `2.1.107` across proxy defaults, documentation, and extraction script.
+
+See [docs/release-notes/RELEASE_NOTES_1.1.9.md](docs/release-notes/RELEASE_NOTES_1.1.9.md) for the full release notes.
+
 ## [1.1.8] - 2026-04-03
 
 ### Fixed
@@ -184,7 +192,8 @@ Initial public release of claude-oauth-proxy.
 
 See [docs/release-notes/RELEASE_NOTES_1.0.0.md](docs/release-notes/RELEASE_NOTES_1.0.0.md) for the full release notes.
 
-[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.8...HEAD
+[Unreleased]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.9...HEAD
+[1.1.9]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.8...1.1.9
 [1.1.8]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.7...1.1.8
 [1.1.7]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.6...1.1.7
 [1.1.6]: https://github.com/BonzTM/claude-oauth-proxy/compare/1.1.5...1.1.6

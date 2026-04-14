@@ -32,8 +32,8 @@ Most users only need to change three things:
 | `CLAUDE_OAUTH_PROXY_SEED_FILE` | unset | Read-only seed token file (e.g. Claude CLI credentials) |
 | `CLAUDE_OAUTH_PROXY_CORS_ORIGINS` | unset (disabled) | Comma-separated allowed CORS origins, or `*` for all |
 | `CLAUDE_OAUTH_PROXY_MAX_REQUEST_BODY` | `10MB` | Maximum request body size (supports `KB`, `MB`, `GB` suffixes) |
-| `CLAUDE_OAUTH_PROXY_CC_VERSION` | `2.1.91` | Claude Code version for billing header and User-Agent |
-| `CLAUDE_OAUTH_PROXY_CC_USER_AGENT` | `claude-cli/2.1.91 (external, cli)` | User-Agent header sent upstream |
+| `CLAUDE_OAUTH_PROXY_CC_VERSION` | `2.1.107` | Claude Code version for billing header and User-Agent |
+| `CLAUDE_OAUTH_PROXY_CC_USER_AGENT` | `claude-cli/2.1.107 (external, cli)` | User-Agent header sent upstream |
 | `CLAUDE_OAUTH_PROXY_CC_SDK_VERSION` | `0.74.0` | JS SDK version for X-Stainless-Package-Version header |
 | `CLAUDE_OAUTH_PROXY_CC_RUNTIME_VERSION` | `v25.8.1` | Node.js version for X-Stainless-Runtime-Version header |
 | `CLAUDE_OAUTH_PROXY_CC_OS` | `Linux` | OS identifier for X-Stainless-OS header |
